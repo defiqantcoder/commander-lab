@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { ArrowUpRight, Coins, Sparkles } from 'lucide-svelte';
+  import { ArrowUpRight, Sparkles } from 'lucide-svelte';
   import { manaSymbols, type DeckCard } from './types';
 
   export let card: DeckCard;
   export let onselect: (card: DeckCard) => void = () => {};
 
   const roleTone: Record<string, string> = {
-    ramp: 'green', draw: 'blue', engine: 'violet', interaction: 'red', payoff: 'amber', commander: 'white'
+    ramp: 'green', draw: 'blue', engine: 'violet', interaction: 'red', payoff: 'amber', land: 'green', commander: 'white', other: 'white'
   };
 </script>
 

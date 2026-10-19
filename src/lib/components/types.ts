@@ -1,34 +1,17 @@
-export interface CollectionCard {
-  id: string;
-  name: string;
-  set: string;
-  collectorNumber: string;
-  foil: boolean;
-  purchasePrice?: number;
-  currentPriceUsd?: number;
-  quantity: number;
-  reprintRiskScore?: number;
-}
+import type { CollectionCard as StoredCollectionCard, SavedDeck as StoredSavedDeck } from '$lib/db';
 
-export type CardRole = 'ramp' | 'draw' | 'engine' | 'interaction' | 'payoff' | 'commander';
+export type CollectionCard = StoredCollectionCard;
+export type SavedDeck = StoredSavedDeck;
+export type CardRole = 'commander' | 'ramp' | 'draw' | 'engine' | 'interaction' | 'payoff' | 'land' | 'other';
 
 export interface DeckCard extends CollectionCard {
   manaCost: string;
   cmc: number;
   role: CardRole;
   typeLine: string;
+  oracleText?: string;
   synergyNotes?: string;
   budgetReplacement?: string;
-}
-
-export interface SavedDeck {
-  id: string;
-  name: string;
-  commanderId: string;
-  archetype: string;
-  saltScore: number;
-  cards: { id: string; name: string; category: string; synergyNotes: string }[];
-  updatedAt: Date;
 }
 
 export function manaSymbols(manaCost: string): string[] {

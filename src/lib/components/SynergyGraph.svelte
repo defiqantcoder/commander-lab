@@ -1,25 +1,42 @@
 <script lang="ts">
   import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
   import { Focus, GitBranch } from 'lucide-svelte';
+  import { generateSynergyGraph } from '$lib/engine/synergy';
+  import type { SynergyEdge, SynergyNode } from '$lib/engine/synergy';
+  import type { DeckCard } from './types';
 
-  let nodes = [
-    { id: '1', position: { x: 10, y: 105 }, data: { label: 'Hardened Scales' }, type: 'input' },
-    { id: '2', position: { x: 220, y: 105 }, data: { label: 'Counter engine' } },
-    { id: '3', position: { x: 430, y: 25 }, data: { label: 'Evolution Sage' } },
-    { id: '4', position: { x: 430, y: 185 }, data: { label: 'Atraxa, Praetors’ Voice' }, type: 'output' },
-    { id: '5', position: { x: 640, y: 105 }, data: { label: 'Proliferate loop' } }
-  ];
-  let edges = [
-    { id: 'e1-2', source: '1', target: '2', animated: true, label: '+1 counter' },
-    { id: 'e2-3', source: '2', target: '3', label: 'landfall' },
-    { id: 'e2-4', source: '2', target: '4', label: 'upkeep' },
-    { id: 'e3-5', source: '3', target: '5', animated: true },
-    { id: 'e4-5', source: '4', target: '5' }
-  ];
+  export let cards: DeckCard[] = [];
+
+  $: graph = generateSynergyGraph(cards.map((card) => ({
+    id: card.id,
+    name: card.name,
+    typeLine: card.typeLine,
+    oracleText: card.oracleText,
+    manaCost: card.manaCost,
+    cmc: card.cmc,
+    category: card.role
+  })));
+  $: nodes = toFlowNodes();
+  $: edges = graph.edges as SynergyEdge[];
+  $: nodeCount = nodes.length;
+  $: edgeCount = edges.length;
+
+  let nodes: SynergyNode[] = [];
+  let edges: SynergyEdge[] = [];
+  let nodeCount = 0;
+  let edgeCount = 0;
+
+  function toFlowNodes(): SynergyNode[] {
+    return graph.nodes.map((node) => ({ ...node, type: 'default' }));
+  }
+
+  function resetPositions(): void {
+    nodes = toFlowNodes().map((node) => ({ ...node, position: { ...node.position } }));
+  }
 </script>
 
 <div class="graph-shell">
-  <div class="graph-toolbar"><span><GitBranch size={13} /> ENGINE MAP</span><button aria-label="Fit graph to view" title="Fit graph to view"><Focus size={14} /></button></div>
+  <div class="graph-toolbar"><span><GitBranch size={13} /> ENGINE MAP</span><button onclick={resetPositions} aria-label="Reset graph layout" title="Reset graph layout"><Focus size={14} /></button></div>
   <div class="flow-stage">
     <SvelteFlow bind:nodes bind:edges fitView>
       <Background color="#34343a" gap={20} />
@@ -27,7 +44,7 @@
       <MiniMap pannable zoomable />
     </SvelteFlow>
   </div>
-  <div class="graph-legend"><span><i class="legend-blue"></i>Enabler</span><span><i class="legend-green"></i>Engine</span><span><i class="legend-violet"></i>Payoff</span><span class="chain-count">5 nodes · 5 links</span></div>
+  <div class="graph-legend"><span><i class="legend-blue"></i>Enabler</span><span><i class="legend-green"></i>Engine</span><span><i class="legend-violet"></i>Payoff</span><span class="chain-count">{nodeCount} nodes · {edgeCount} links</span></div>
 </div>
 
 <style>

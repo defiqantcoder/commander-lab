@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { LayoutGrid, List } from 'lucide-svelte';
   import CardRow from './CardRow.svelte';
   import { manaSymbols, type DeckCard } from './types';
 
   export let cards: DeckCard[] = [];
   export let onselect: (card: DeckCard) => void = () => {};
   export let view: 'grid' | 'list' = 'grid';
+
+  const roleTone: Record<string, string> = { ramp: 'green', draw: 'blue', engine: 'violet', interaction: 'red', payoff: 'amber', land: 'green', commander: 'white', other: 'white' };
 </script>
 
 <div class="card-list" class:list-mode={view === 'list'}>
@@ -20,7 +21,7 @@
         <span class="card-info">
           <span class="card-heading"><strong>{card.name}</strong><span class="price">${(card.currentPriceUsd ?? 0).toFixed(2)}</span></span>
           <span class="card-subheading"><span class="mana-pips">{#each manaSymbols(card.manaCost) as pip}<i class={`mana-pip pip-${pip.toLowerCase()}`}>{pip}</i>{/each}</span><span class="dot-separator">·</span><span>{card.typeLine}</span></span>
-          <span class="role-label">{card.role}</span>
+          <span class={`role-label role-${roleTone[card.role] ?? 'white'}`}>{card.role}</span>
         </span>
       </button>
     {/each}
@@ -52,10 +53,12 @@
   .card-subheading { display: flex; min-width: 0; gap: 5px; overflow: hidden; color: #777780; font-size: 9px; white-space: nowrap; }
   .card-subheading span:last-child { overflow: hidden; text-overflow: ellipsis; }
   .mana-pips { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; }
-  .mana-pip { display: grid; min-width: 13px; height: 13px; place-items: center; padding: 0 2px; border: 1px solid #66666d; border-radius: 50%; background: #deded9; color: #18181b; font-size: 7px; font-style: normal; line-height: 1; }
+  .mana-pip { display: grid; min-width: 13px; height: 13px; place-items: center; padding: 0 2px; border: 1px solid #66666d; border-radius: 50%; background: #deded9; color: #18181b; font-size: 7px; font-style: normal; line-height: 1; transition: transform .15s ease, filter .15s ease; }
+  .grid-card:hover .mana-pip { transform: translateY(-1px); filter: brightness(1.12); }
   .pip-w { background: #f9fafb; }.pip-u { border-color: #38bdf8; background: #0369a1; color: #e0f2fe; }.pip-b { border-color: #a855f7; background: #27202d; color: #e9d5ff; }.pip-r { border-color: #ef4444; background: #7f1d1d; color: #fee2e2; }.pip-g { border-color: #22c55e; background: #14532d; color: #dcfce7; }
   .dot-separator { color: #52525b; }
-  .role-label { color: #8d8d97; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+  .role-label { justify-self: start; padding: 3px 5px; border: 1px solid currentColor; border-radius: 3px; font-family: var(--mono); font-size: 7px; text-transform: uppercase; }
+  .role-green { color: #4ade80; }.role-blue { color: #7dd3fc; }.role-violet { color: #c084fc; }.role-red { color: #f87171; }.role-amber { color: #fbbf24; }.role-white { color: #d4d4d8; }
   .list-mode { display: block; padding: 0 0 4px; }
   .list-header { display: grid; grid-template-columns: minmax(130px, 1fr) 70px 88px 32px 62px; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #2b2b30; color: #666671; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
   .list-header span:first-child { grid-column: 1; }
