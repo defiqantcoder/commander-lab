@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { calculateReprintRisk, type ScryfallCard } from './scryfall';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { calculateReprintRisk, autocompleteCardName, type ScryfallCard } from './scryfall';
 
 describe('ScryfallAPI', () => {
   it('returns 0 reprint risk for Reserved List cards', () => {
@@ -60,3 +60,20 @@ describe('ScryfallAPI', () => {
   });
 });
 
+describe('autocompleteCardName fallback', () => {
+  beforeEach(() => {
+    // We mock global fetch here because autocompleteCardName calls fetchWithCache
+    // which internally uses global fetch, and mocking an exported function used
+    // within the same file doesn't always work cleanly without restructuring.
+    vi.spyOn(global, 'fetch').mockImplementation(() => Promise.reject(new Error('Network error')));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns empty array on fetch error', async () => {
+    const result = await autocompleteCardName('Black L');
+    expect(result).toEqual([]);
+  });
+});
