@@ -222,21 +222,7 @@ export function auditDeckSaltAndPower(cards: CardSynergyInput[]): SaltScoreAudit
   };
 }
 
-/**
- * Generates interactive Svelte Flow nodes and edges for combo and synergy loops
- */
-export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphData {
-  const nodes: SynergyNode[] = [];
-  const edges: SynergyEdge[] = [];
-  const cardMap = new Map<string, CardSynergyInput>();
-
-  cards.forEach(c => cardMap.set(c.name, c));
-
-  // Find commanders
-  const commanders = cards.filter(c => c.category === 'commander');
-  let currentY = 50;
-
-  // Add commander nodes at root
+function addCommanderNodes(commanders: CardSynergyInput[], nodes: SynergyNode[], startY: number) {
   commanders.forEach((cmd, idx) => {
     nodes.push({
       id: `cmd-${cmd.id || idx}`,
@@ -248,13 +234,18 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
         role: 'Commander',
         cmc: cmd.cmc
       },
-      position: { x: 300 + idx * 220, y: currentY }
+      position: { x: 300 + idx * 220, y: startY }
     });
   });
+}
 
-  currentY += 150;
-
-  // Check known combo interactions
+function addComboInteractions(
+  nodes: SynergyNode[],
+  edges: SynergyEdge[],
+  commanders: CardSynergyInput[],
+  cardMap: Map<string, CardSynergyInput>,
+  startY: number
+) {
   let comboIdx = 0;
   for (const combo of NOTABLE_COMBO_PAIRS) {
     const cardA = cardMap.get(combo.pair[0]);
@@ -275,7 +266,7 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
             role: 'Combo Piece',
             cmc: cardA.cmc
           },
-          position: { x: 100 + (comboIdx % 3) * 260, y: currentY }
+          position: { x: 100 + (comboIdx % 3) * 260, y: startY }
         });
       }
 
@@ -290,7 +281,7 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
             role: 'Win Condition',
             cmc: cardB.cmc
           },
-          position: { x: 100 + (comboIdx % 3) * 260, y: currentY + 120 }
+          position: { x: 100 + (comboIdx % 3) * 260, y: startY + 120 }
         });
       }
 
@@ -317,63 +308,96 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
       comboIdx++;
     }
   }
+}
+
+function addThemeEngineChains(
+  cards: CardSynergyInput[],
+  nodes: SynergyNode[],
+  edges: SynergyEdge[],
+  commanders: CardSynergyInput[],
+  startY: number
+) {
+  const engines = cards.filter(c => classifyCardRole(c) === 'engine').slice(0, 4);
+  const payoffs = cards.filter(c => classifyCardRole(c) === 'payoff').slice(0, 3);
+
+  engines.forEach((eng, i) => {
+    const engId = `node-eng-${eng.id || i}`;
+    nodes.push({
+      id: engId,
+      type: 'engineNode',
+      data: {
+        label: eng.name,
+        cardName: eng.name,
+        category: 'engine',
+        role: 'Value Engine',
+        cmc: eng.cmc
+      },
+      position: { x: 80 + i * 220, y: startY }
+    });
+
+    if (commanders.length > 0) {
+      edges.push({
+        id: `edge-cmd-eng-${i}`,
+        source: `cmd-${commanders[0].id || 0}`,
+        target: engId,
+        label: 'Synergizes With',
+        animated: true
+      });
+    }
+  });
+
+  payoffs.forEach((pay, j) => {
+    const payId = `node-pay-${pay.id || j}`;
+    nodes.push({
+      id: payId,
+      type: 'payoffNode',
+      data: {
+        label: pay.name,
+        cardName: pay.name,
+        category: 'payoff',
+        role: 'Win-Con Payoff',
+        cmc: pay.cmc
+      },
+      position: { x: 140 + j * 240, y: startY + 140 }
+    });
+
+    if (engines.length > 0) {
+      edges.push({
+        id: `edge-eng-pay-${j}`,
+        source: `node-eng-${engines[j % engines.length].id || (j % engines.length)}`,
+        target: payId,
+        label: 'Powers Win-Con',
+        animated: false
+      });
+    }
+  });
+}
+
+/**
+ * Generates interactive Svelte Flow nodes and edges for combo and synergy loops
+ */
+export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphData {
+  const nodes: SynergyNode[] = [];
+  const edges: SynergyEdge[] = [];
+  const cardMap = new Map<string, CardSynergyInput>();
+
+  cards.forEach(c => cardMap.set(c.name, c));
+
+  // Find commanders
+  const commanders = cards.filter(c => c.category === 'commander');
+  let currentY = 50;
+
+  // Add commander nodes at root
+  addCommanderNodes(commanders, nodes, currentY);
+
+  currentY += 150;
+
+  // Check known combo interactions
+  addComboInteractions(nodes, edges, commanders, cardMap, currentY);
 
   // If no known combo pairs found, build theme/engine chain from high-impact cards
   if (edges.length === 0 && cards.length > 0) {
-    const engines = cards.filter(c => classifyCardRole(c) === 'engine').slice(0, 4);
-    const payoffs = cards.filter(c => classifyCardRole(c) === 'payoff').slice(0, 3);
-
-    engines.forEach((eng, i) => {
-      const engId = `node-eng-${eng.id || i}`;
-      nodes.push({
-        id: engId,
-        type: 'engineNode',
-        data: {
-          label: eng.name,
-          cardName: eng.name,
-          category: 'engine',
-          role: 'Value Engine',
-          cmc: eng.cmc
-        },
-        position: { x: 80 + i * 220, y: currentY }
-      });
-
-      if (commanders.length > 0) {
-        edges.push({
-          id: `edge-cmd-eng-${i}`,
-          source: `cmd-${commanders[0].id || 0}`,
-          target: engId,
-          label: 'Synergizes With',
-          animated: true
-        });
-      }
-    });
-
-    payoffs.forEach((pay, j) => {
-      const payId = `node-pay-${pay.id || j}`;
-      nodes.push({
-        id: payId,
-        type: 'payoffNode',
-        data: {
-          label: pay.name,
-          cardName: pay.name,
-          category: 'payoff',
-          role: 'Win-Con Payoff',
-          cmc: pay.cmc
-        },
-        position: { x: 140 + j * 240, y: currentY + 140 }
-      });
-
-      if (engines.length > 0) {
-        edges.push({
-          id: `edge-eng-pay-${j}`,
-          source: `node-eng-${engines[j % engines.length].id || (j % engines.length)}`,
-          target: payId,
-          label: 'Powers Win-Con',
-          animated: false
-        });
-      }
-    });
+    addThemeEngineChains(cards, nodes, edges, commanders, currentY);
   }
 
   return { nodes, edges };
