@@ -132,9 +132,24 @@ export class GoldfishSimulator {
     quality: 'Excellent' | 'Good' | 'Risky' | 'Unplayable';
     recommendation: string;
   } {
-    const lands = hand.filter(c => /land/i.test(c.typeLine));
-    const ramp = hand.filter(c => c.cmc <= 3 && /ramp/i.test(c.category || ''));
-    const cheapSpells = hand.filter(c => !/land/i.test(c.typeLine) && c.cmc <= 3);
+    const lands: SimCard[] = [];
+    const ramp: SimCard[] = [];
+    const cheapSpells: SimCard[] = [];
+
+    for (let i = 0; i < hand.length; i++) {
+      const c = hand[i];
+      const isLand = /land/i.test(c.typeLine);
+
+      if (isLand) {
+        lands.push(c);
+      } else if (c.cmc <= 3) {
+        cheapSpells.push(c);
+      }
+
+      if (c.cmc <= 3 && /ramp/i.test(c.category || '')) {
+        ramp.push(c);
+      }
+    }
 
     const landCount = lands.length;
 
