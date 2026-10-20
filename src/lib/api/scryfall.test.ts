@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { calculateReprintRisk, getCardById, autocompleteCardName, type ScryfallCard } from './scryfall';
+import { calculateReprintRisk, getCardById, autocompleteCardName, searchCards, type ScryfallCard } from './scryfall';
 
 vi.mock('$lib/db', () => ({
   db: {
@@ -152,6 +152,27 @@ describe('ScryfallAPI', () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const result = await autocompleteCardName('Black L');
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('searchCards', () => {
+    it('encodes search queries and handles pagination', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ total_cards: 1, has_more: false, data: [] })
+      });
+      global.fetch = mockFetch;
+
+      await searchCards('type:creature cmc=3', 2);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.scryfall.com/cards/search?q=type%3Acreature%20cmc%3D3&page=2',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: 'application/json'
+          })
+        })
+      );
     });
   });
 });
