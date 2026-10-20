@@ -320,8 +320,17 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
 
   // If no known combo pairs found, build theme/engine chain from high-impact cards
   if (edges.length === 0 && cards.length > 0) {
-    const engines = cards.filter(c => classifyCardRole(c) === 'engine').slice(0, 4);
-    const payoffs = cards.filter(c => classifyCardRole(c) === 'payoff').slice(0, 3);
+    const engines: CardSynergyInput[] = [];
+    const payoffs: CardSynergyInput[] = [];
+    for (const c of cards) {
+      if (engines.length >= 4 && payoffs.length >= 3) break;
+      const role = classifyCardRole(c);
+      if (role === 'engine' && engines.length < 4) {
+        engines.push(c);
+      } else if (role === 'payoff' && payoffs.length < 3) {
+        payoffs.push(c);
+      }
+    }
 
     engines.forEach((eng, i) => {
       const engId = `node-eng-${eng.id || i}`;
