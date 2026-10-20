@@ -1,3 +1,4 @@
+// [/] Jules
 export interface CardCheckItem {
   id: string;
   name: string;
@@ -127,6 +128,15 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
     errors.push({
       type: 'invalid_commander',
       message: 'Commander decks cannot have more than 2 commanders (e.g. Partner / Friends Forever / Background pairs).'
+    });
+  }
+
+
+  // 1.5. Partner / Multi-Commander Warnings
+  if (commanders.length === 2) {
+    warnings.push({
+      type: 'partner_pairing',
+      message: 'Deck has 2 commanders. Ensure they legally partner (e.g. Partner, Friends Forever, Choose a Background).'
     });
   }
 

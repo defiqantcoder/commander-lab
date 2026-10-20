@@ -122,7 +122,7 @@ export function classifyCardRole(card: CardSynergyInput): 'commander' | 'ramp' |
 
   // Ramp
   if (
-    /add (\{[wubrgc]\}|mana)/i.test(text) ||
+    /add (.*mana|\{[wubrgc]\})/i.test(text) ||
     /search your library for a (basic )?land/i.test(text) ||
     /create (a )?treasure token/i.test(text)
   ) {

@@ -140,8 +140,8 @@ export const db = new CommanderLabDB();
 
 ### Antigravity Track (Data, Engine & Logic)
 - **Domain:** `src/lib/engine/`, `src/lib/db/`, `src/lib/api/`, test suites
-- [/] **Scryfall Cache & Dexie Store**: Ingestion schema, rate limiter, IndexedDB persistence.
-- [ ] **Commander Validator**: 100-card color identity, singleton check, banlist verification.
+- [x] **Scryfall Cache & Dexie Store**: Ingestion schema, rate limiter, IndexedDB persistence.
+- [x] **Commander Validator**: 100-card color identity, singleton check, banlist verification.
 - [ ] **Synergy Engine**: Scoring algorithm and local prompt pipeline for deck evaluation.
 - [ ] **Goldfish Simulator Core**: Turn-based state machine for hand draws and mana curves.
 
