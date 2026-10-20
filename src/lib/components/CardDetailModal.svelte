@@ -42,7 +42,13 @@
           <div class="block-title"><ArrowDownRight size={14} /> Budget alternative</div>
           <div class="replacement-line"><strong>{card.budgetReplacement ?? 'Evolution Sage'}</strong><span>Similar role · lower market price</span></div>
         </section>
-        <a class="scryfall-link" href={`https://scryfall.com/search?q=${encodeURIComponent(card.name)}`} target="_blank" rel="noreferrer">Open on Scryfall <ExternalLink size={13} /></a>
+        <div class="footer-row">
+          <a class="scryfall-link" href={`https://scryfall.com/search?q=${encodeURIComponent(card.name)}`} target="_blank" rel="noreferrer">Open on Scryfall <ExternalLink size={13} /></a>
+          <div class="keyboard-hints" aria-label="Keyboard shortcuts">
+            <span class="key-pill"><kbd>←</kbd><kbd>→</kbd> Navigate</span>
+            <span class="key-pill"><kbd>Esc</kbd> Close</span>
+          </div>
+        </div>
       </div>
     </dialog>
   </div>
@@ -73,6 +79,10 @@
   .replacement-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; padding: 10px; border: 1px solid #2e2e34; border-radius: 5px; background: #19191d; }
   .replacement-line strong { color: #e4e4e7; font-size: 11px; }
   .replacement-line span { color: #777780; font-size: 9px; text-align: right; }
-  .scryfall-link { display: inline-flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 16px; color: #7dd3fc; font-size: 10px; }
+  .footer-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid #232328; }
+  .scryfall-link { display: inline-flex; align-items: center; gap: 6px; color: #7dd3fc; font-size: 10px; }
+  .keyboard-hints { display: flex; align-items: center; gap: 8px; }
+  .key-pill { display: inline-flex; align-items: center; gap: 3px; color: #71717a; font-family: var(--mono); font-size: 8px; }
+  .key-pill kbd { padding: 2px 4px; border: 1px solid #3f3f46; border-radius: 3px; background: #1c1c21; color: #a1a1aa; font-family: inherit; font-size: 8px; font-weight: 600; }
   @media (max-width: 560px) { .scrim { align-items: end; padding: 0; } .detail-modal { width: 100%; max-height: 92vh; grid-template-columns: 100px minmax(0, 1fr); border-radius: 10px 10px 0 0; } .detail-art { min-height: 150px; } .detail-copy { padding: 20px 14px 18px; } h2 { font-size: 17px; } .replacement-line { align-items: start; flex-direction: column; gap: 4px; } .replacement-line span { text-align: left; } }
 </style>

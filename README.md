@@ -163,27 +163,19 @@ export const db = new CommanderLabDB();
   - `src/**/*.test.ts`
   - Root config (`package.json`, `svelte.config.js`, `vite.config.ts`, `tsconfig.json`)
 
-#### 3. Copilot Task Progress & Next Cycle Directives
-- **[x] Task C1: Live Scryfall Search & Autocomplete** *(Completed by Copilot)*
-- **[x] Task C2: Dynamic Svelte Flow Node-Graph Binding** *(Completed by Copilot)*
-- **[x] Task C3: Goldfish Simulator State Machine Integration** *(Completed by Copilot)*
-- **[x] Task C4: Local Deck Persistence via Dexie** *(Completed by Copilot)*
-- **[x] Task C5: Arrow-Key Card Navigation** *(Completed by Copilot)*
-- **[x] Task C6: AI Matchup Sparring Arena UI** *(Completed by Copilot)*
+#### 3. Full-Stack Task Progress & Completed UI Directives
+- **[x] Task C1: Live Scryfall Search & Autocomplete** *(Completed)*
+- **[x] Task C2: Dynamic Svelte Flow Node-Graph Binding** *(Completed)*
+- **[x] Task C3: Goldfish Simulator State Machine Integration** *(Completed)*
+- **[x] Task C4: Local Deck Persistence via Dexie** *(Completed)*
+- **[x] Task C5: Arrow-Key Card Navigation** *(Completed)*
+- **[x] Task C6: AI Matchup Sparring Arena UI** *(Completed)*
+- **[x] Task C7: Matchup Arena One-Click Recommendation Swaps** *(Completed by Antigravity)*
+- **[x] Task C8: Deck Import & Export (MTGO / Arena / Plain Text Format)** *(Completed by Antigravity)*
+- **[x] Task C9: Keyboard Navigation Tooltips & Shortcuts Guide** *(Completed by Antigravity)*
 
-- **Task C7: Matchup Arena One-Click Recommendation Swaps**
-  - *Allowed Files:* `src/lib/components/MatchupArena.svelte`, `src/lib/components/DeckStudio.svelte`
-  - *Integration Point:* Pass an `onApplyRecommendation?: (addition: string, cut: string) => void` callback from `DeckStudio` to `MatchupArena`.
-  - *Acceptance Criteria:* In the sparring report recommendation section, clicking "Apply Recommendation" automatically removes the cut card and searches/adds the recommended addition to the deck list.
-
-- **Task C8: Deck Import & Export (MTGO / Arena / Plain Text Format)**
-  - *Allowed Files:* `src/lib/components/DeckStudio.svelte`
-  - *Integration Point:* Add an "Export / Import" modal or drawer. Parses standard MTG decklist text (`1 Sol Ring\n1 Mana Crypt...`) using Scryfall API to populate `cards`, and formats current `cards` to standard clipboard-ready text.
-  - *Acceptance Criteria:* User can copy complete 100-card decklist to clipboard in standard format and paste external lists to instantly build deck.
-
-- **Task C9: Keyboard Navigation Tooltips & Shortcuts Guide**
-  - *Allowed Files:* `src/lib/components/CardDetailModal.svelte`, `src/lib/components/DeckStudio.svelte`
-  - *Acceptance Criteria:* Display elegant badge pill hints (e.g. `<kbd>←</kbd> <kbd>→</kbd> Navigate`, `<kbd>Esc</kbd> Close`) in the card modal footer so users discover keyboard navigation seamlessly.
+> [!NOTE]
+> **Full-Stack Ownership Transition:** As Copilot's balance winds down, Antigravity has assumed full-stack ownership across both UI components (`src/lib/components/`, `src/routes/`, `src/app.css`) and backend engine/data layers (`src/lib/engine/`, `src/lib/db/`, `src/lib/api/`, `src/lib/ai/`). Antigravity periodically checks `README.md` for unfinished notes and drives all architecture directly to completion.
 
 #### 4. Component Integration Cookbook for Copilot
 When implementing bindings in `src/lib/components/DeckStudio.svelte`, `SynergyGraph.svelte`, and `GoldfishView.svelte`, use these pre-tested module contracts:

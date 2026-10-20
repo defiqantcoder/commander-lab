@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, ArrowDownWideNarrow, ChevronDown, ChevronRight, CircleDollarSign, Filter, Grid2X2, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, WandSparkles } from 'lucide-svelte';
+  import { Activity, ArrowDownWideNarrow, Check, ChevronDown, ChevronRight, CircleDollarSign, Copy, Download, FileText, Filter, Grid2X2, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
   import { getAllDecks, getDeck, saveDeck } from '$lib/db';
   import CardGrid from './CardGrid.svelte';
   import CardDetailModal from './CardDetailModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
   import MatchupArena from './MatchupArena.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
-  import { autocompleteCardName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
+  import { autocompleteCardName, getCardByName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
   import { auditDeckSaltAndPower, classifyCardRole, generateSynergyGraph, type CardSynergyInput, type SaltScoreAudit, type SynergyGraphData } from '$lib/engine/synergy';
   import type { CardRole, DeckCard, SavedDeck } from './types';
 
@@ -261,6 +261,124 @@
     activeView = 'engines';
   }
 
+  async function applyArenaAddition(cardName: string, role = 'engine'): Promise<void> {
+    if (cards.some((c) => c.name.toLowerCase() === cardName.toLowerCase())) return;
+    try {
+      const scryfallCard = await getCardByName(cardName);
+      if (scryfallCard) {
+        const newCard = toDeckCard(scryfallCard, (role as CardRole) || 'engine');
+        cards = [...cards, newCard];
+        saveStatus = `Added ${cardName}`;
+      } else {
+        const fallbackCard: DeckCard = {
+          id: `custom-${Date.now()}`,
+          name: cardName,
+          set: 'custom',
+          collectorNumber: '1',
+          foil: false,
+          quantity: 1,
+          role: (role as CardRole) || 'engine',
+          cmc: 3,
+          typeLine: 'Spell'
+        };
+        cards = [...cards, fallbackCard];
+        saveStatus = `Added ${cardName}`;
+      }
+    } catch {
+      saveStatus = `Could not add ${cardName}`;
+    }
+  }
+
+  function applyArenaCut(cardName: string): void {
+    const countBefore = cards.length;
+    cards = cards.filter((c) => c.name.toLowerCase() !== cardName.toLowerCase());
+    if (cards.length < countBefore) {
+      saveStatus = `Removed ${cardName}`;
+    }
+  }
+
+  let showIOModal = $state(false);
+  let ioMode = $state<'export' | 'import'>('export');
+  let importText = $state('');
+  let importAppend = $state(false);
+  let copyFeedback = $state(false);
+  let isImporting = $state(false);
+
+  function getExportDecklist(): string {
+    const lines: string[] = [];
+    lines.push('// Commander');
+    lines.push(`1 ${commander.name}`);
+    lines.push('');
+    lines.push('// Mainboard');
+    for (const card of cards) {
+      lines.push(`${card.quantity || 1} ${card.name}`);
+    }
+    return lines.join('\n');
+  }
+
+  async function copyExportToClipboard(): Promise<void> {
+    const text = getExportDecklist();
+    await navigator.clipboard.writeText(text);
+    copyFeedback = true;
+    setTimeout(() => copyFeedback = false, 2000);
+  }
+
+  function downloadExportDecklist(): void {
+    const text = getExportDecklist();
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${deck.name.replace(/[^a-z0-9_-]/gi, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function processImport(): Promise<void> {
+    if (!importText.trim()) return;
+    isImporting = true;
+    try {
+      const lines = importText.split('\n');
+      const newCards: DeckCard[] = [];
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('//') || line.startsWith('#')) continue;
+        const match = line.match(/^(\d+)?x?\s*(.+)$/);
+        if (!match) continue;
+        const qty = parseInt(match[1] || '1', 10);
+        const rawName = match[2].replace(/\s*\([A-Za-z0-9]+\)\s*(\d+)?$/, '').trim();
+        if (rawName.toLowerCase() === commander.name.toLowerCase()) continue;
+
+        const existing = cards.find((c) => c.name.toLowerCase() === rawName.toLowerCase());
+        if (existing) {
+          newCards.push({ ...existing, quantity: qty });
+        } else {
+          newCards.push({
+            id: `import-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: rawName,
+            set: 'custom',
+            collectorNumber: '1',
+            foil: false,
+            quantity: qty,
+            role: 'engine',
+            cmc: 3,
+            typeLine: 'Spell'
+          });
+        }
+      }
+      if (importAppend) {
+        cards = [...cards, ...newCards.filter((nc) => !cards.some((c) => c.name.toLowerCase() === nc.name.toLowerCase()))];
+      } else if (newCards.length > 0) {
+        cards = newCards;
+      }
+      saveStatus = `Imported ${newCards.length} cards`;
+      showIOModal = false;
+      importText = '';
+    } finally {
+      isImporting = false;
+    }
+  }
+
   function roleCount(role: CardRole): number { return cards.filter((card) => card.role === role).length; }
 </script>
 
@@ -269,7 +387,12 @@
 <main class="page-wrap">
   <div class="workspace-heading enter">
     <div><div class="breadcrumb"><span>DECKS</span><ChevronRight size={12} /><span class="current-crumb">{deck.name}</span><i></i><span class="saved-label">{saveStatus}</span></div><h1><input class="deck-name-input" bind:value={deck.name} aria-label="Deck name" /><small>v.04</small></h1><div class="heading-meta"><span class="commander-label"><i></i>Atraxa, Praetors’ Voice</span><b></b><span>{deck.archetype}</span><b></b><span>Updated just now</span></div></div>
-    <div class="heading-actions"><button class="subtle-button" onclick={() => activeView = activeView === 'engines' ? 'studio' : 'engines'}><Activity size={13} /> Engine map</button><button class="subtle-button" onclick={() => persistDeck()} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save deck'}</button><button class="primary-button" onclick={analyzeDeck}><WandSparkles size={13} /> Analyze deck</button></div>
+    <div class="heading-actions">
+      <button class="subtle-button" onclick={() => activeView = activeView === 'engines' ? 'studio' : 'engines'}><Activity size={13} /> Engine map</button>
+      <button class="subtle-button" onclick={() => showIOModal = true}><FileText size={13} /> Decklist I/O</button>
+      <button class="subtle-button" onclick={() => persistDeck()} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save deck'}</button>
+      <button class="primary-button" onclick={analyzeDeck}><WandSparkles size={13} /> Analyze deck</button>
+    </div>
   </div>
 
   <nav class="view-tabs" aria-label="Workspace views"><button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button><button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button><button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button><button class:active={activeView === 'matchup'} onclick={() => activeView = 'matchup'}><Target size={14} /> Matchup Arena</button><span></span><div class="identity"><i>W</i><i>U</i><i>B</i><i>G</i></div></nav>
@@ -277,7 +400,7 @@
   {#if activeView === 'goldfish'}
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
   {:else if activeView === 'matchup'}
-    <div class="matchup-view enter"><MatchupArena {cards} {commander} {savedDecks} deckName={deck.name} /></div>
+    <div class="matchup-view enter"><MatchupArena {cards} {commander} {savedDecks} deckName={deck.name} onApplyAddition={applyArenaAddition} onApplyCut={applyArenaCut} /></div>
   {:else if activeView === 'engines'}
     <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">Proliferate feedback loop</span><small>{analyzedGraph ? `${analyzedGraph.nodes.length} nodes · ${analyzedGraph.edges.length} links` : `Generated from ${graphCards.length} cards`}</small></div><button class="subtle-button" onclick={analyzeDeck}><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} graphData={analyzedGraph} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div>{#if deckAudit}<div class="audit-summary"><div><span>Power bracket</span><strong>{deckAudit.estimatedPowerBracket} · {deckAudit.estimatedPowerNumber}/10</strong></div><div><span>Average salt</span><strong>{deckAudit.averageSaltScore}</strong></div><div><span>Notable cards</span><strong>{deckAudit.highSaltCards.length}</strong></div></div>{/if}<div class="note"><b>01</b><div><strong>Landfall to proliferate</strong><p>Evolution Sage triggers on each land entering. Fetch lands can create a second trigger in a turn.</p></div></div><div class="note"><b>02</b><div><strong>Counter multiplication</strong><p>Hardened Scales increases initial placement while Atraxa compounds existing counters.</p></div></div><div class="note"><b>03</b><div><strong>Protection gap</strong><p>Two protection effects are recommended before committing Deepglow Skate.</p></div></div></aside></div>
   {:else}
@@ -311,6 +434,48 @@
 
 <CardDetailModal card={selectedCard} inDeck={selectedCardIsInDeck()} ontoggle={toggleDeckCard} onclose={() => selectedCard = null} />
 
+{#if showIOModal}
+  <div class="scrim" role="presentation" onclick={(e) => e.target === e.currentTarget && (showIOModal = false)}>
+    <div class="io-modal panel" role="dialog" aria-labelledby="io-title" aria-modal="true">
+      <header class="io-header">
+        <div class="io-title-wrap">
+          <span class="eyebrow">DECKLIST MANAGER</span>
+          <h2 id="io-title">Import & Export</h2>
+        </div>
+        <button class="icon-button close-btn" onclick={() => showIOModal = false} aria-label="Close modal"><X size={15} /></button>
+      </header>
+      <div class="io-tabs">
+        <button class:active={ioMode === 'export'} onclick={() => ioMode = 'export'}><Download size={13} /> Export list</button>
+        <button class:active={ioMode === 'import'} onclick={() => ioMode = 'import'}><Upload size={13} /> Import list</button>
+      </div>
+      <div class="io-body">
+        {#if ioMode === 'export'}
+          <p class="io-desc">Standard plain-text / MTGO clipboard format with Commander header.</p>
+          <textarea readonly class="io-textarea" value={getExportDecklist()}></textarea>
+          <div class="io-actions">
+            <button class="primary-button" onclick={copyExportToClipboard}>
+              {#if copyFeedback}<Check size={13} /> Copied!{:else}<Copy size={13} /> Copy to clipboard{/if}
+            </button>
+            <button class="subtle-button" onclick={downloadExportDecklist}><Download size={13} /> Download .txt</button>
+          </div>
+        {:else}
+          <p class="io-desc">Paste decklist (e.g. <code>1 Sol Ring</code> or <code>Arcane Signet</code>). One card per line.</p>
+          <textarea class="io-textarea" placeholder="Paste your decklist here..." bind:value={importText}></textarea>
+          <div class="io-options">
+            <label class="io-check"><input type="checkbox" bind:checked={importAppend} /> Append to existing cards (instead of replacing)</label>
+          </div>
+          <div class="io-actions">
+            <button class="primary-button" disabled={isImporting || !importText.trim()} onclick={processImport}>
+              <Upload size={13} /> {isImporting ? 'Importing...' : 'Import decklist'}
+            </button>
+            <button class="subtle-button" onclick={() => showIOModal = false}>Cancel</button>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .workspace-heading{display:flex;align-items:end;justify-content:space-between;gap:18px;padding:2px 0 16px}.breadcrumb{display:flex;align-items:center;gap:7px;color:#666671;font:8px var(--mono);letter-spacing:.06em}.current-crumb{color:#a1a1aa}.breadcrumb i{width:5px;height:5px;margin-left:5px;border-radius:50%;background:#22c55e}.saved-label{color:#777780;font:9px 'Space Grotesk',sans-serif;letter-spacing:0}h1{display:flex;align-items:center;gap:9px;margin:7px 0 5px;color:#fafafa;font-size:24px;font-weight:600;line-height:1.1}.deck-name-input{width:min(320px,55vw);min-width:150px;padding:0;border:0;border-bottom:1px solid transparent;outline:0;background:transparent;color:inherit;font:inherit}.deck-name-input:hover,.deck-name-input:focus{border-bottom-color:#3f3f46}h1 small{padding:4px 5px;border:1px solid #303036;border-radius:3px;color:#8d8d97;font:8px var(--mono)}.heading-meta{display:flex;align-items:center;gap:9px;color:#777780;font-size:9px}.commander-label{display:inline-flex;align-items:center;gap:6px;color:#c4c4cb}.commander-label i{width:6px;height:6px;border-radius:50%;background:#38bdf8;box-shadow:5px 0 #a855f7,10px 0 #22c55e;margin-right:9px}.heading-meta>b{width:1px;height:10px;background:#3f3f46}.heading-actions{display:flex;gap:7px}.primary-button{display:inline-flex;min-height:30px;align-items:center;gap:6px;padding:0 10px;border:1px solid #38bdf85f;border-radius:5px;background:#0e749033;color:#bae6fd;font-size:10px;cursor:pointer}
   .view-tabs{display:flex;height:40px;align-items:stretch;gap:18px;border-bottom:1px solid #303036}.view-tabs button{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 2px;border:0;background:transparent;color:#777780;font-size:10px;cursor:pointer}.view-tabs button.active{color:#e4e4e7}.view-tabs button.active:after{position:absolute;right:0;bottom:-1px;left:0;height:2px;background:#38bdf8;content:''}.view-tabs button small{padding:2px 5px;border-radius:3px;background:#26262b;color:#a1a1aa;font:8px var(--mono)}.view-tabs>span{flex:1}.identity{display:flex;align-items:center;gap:4px}.identity i{display:grid;width:16px;height:16px;place-items:center;border:1px solid #ffffff26;border-radius:50%;font:8px var(--mono);font-style:normal}.identity i:nth-child(1){background:#deded9;color:#27272a}.identity i:nth-child(2){background:#075985;color:#e0f2fe}.identity i:nth-child(3){background:#27202d;color:#e9d5ff}.identity i:nth-child(4){background:#14532d;color:#dcfce7}
@@ -330,4 +495,21 @@
   @media(max-width:460px){h1{font-size:21px}.heading-meta{flex-wrap:wrap;row-gap:5px}.heading-meta>span:last-child,.heading-meta>b:last-of-type{display:none}.view-tabs{gap:12px}.view-tabs button{font-size:9px}.identity{gap:2px}.identity i{width:14px;height:14px;font-size:7px}.right-rail{grid-template-columns:1fr}.right-rail .synergy-panel{grid-row:auto}.card-summary{font-size:7px}.library-total{display:none}.commander-art{height:105px}}
   .role-land { color: #86efac; }
   .bar-land { color: #22c55e; }
+  .io-modal { position: relative; width: min(540px, 92vw); max-height: 85vh; margin: 0; padding: 0; border: 1px solid #3f3f46; border-radius: 8px; background: #141417; color: inherit; box-shadow: 0 20px 70px rgba(0,0,0,.6); animation: rise-in .2s ease both; }
+  .io-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #27272a; }
+  .io-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+  .io-title-wrap h2 { margin: 0; color: #f4f4f5; font-size: 15px; font-weight: 600; }
+  .close-btn { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #333338; border-radius: 4px; background: #1c1c20; color: #a1a1aa; cursor: pointer; }
+  .close-btn:hover { color: #f4f4f5; border-color: #52525b; }
+  .io-tabs { display: flex; border-bottom: 1px solid #27272a; background: #111114; }
+  .io-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #71717a; font-size: 10px; font-weight: 500; cursor: pointer; }
+  .io-tabs button.active { color: #38bdf8; border-bottom-color: #38bdf8; background: #16161a; }
+  .io-body { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .io-desc { margin: 0; color: #888891; font-size: 9px; line-height: 1.4; }
+  .io-desc code { padding: 2px 4px; border: 1px solid #2d2d32; border-radius: 3px; background: #1c1c20; color: #7dd3fc; font-family: var(--mono); }
+  .io-textarea { width: 100%; height: 210px; padding: 10px 12px; border: 1px solid #2e2e34; border-radius: 5px; background: #0c0c0e; color: #e4e4e7; font-family: var(--mono); font-size: 9px; line-height: 1.5; resize: vertical; outline: none; }
+  .io-textarea:focus { border-color: #38bdf888; }
+  .io-options { display: flex; align-items: center; gap: 8px; }
+  .io-check { display: inline-flex; align-items: center; gap: 7px; color: #a1a1aa; font-size: 9px; cursor: pointer; }
+  .io-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 </style>
