@@ -6,11 +6,23 @@
   export let inDeck = false;
   export let ontoggle: (card: DeckCard) => void = () => {};
   export let onclose: () => void = () => {};
+
+  function focusDialog(node: HTMLDialogElement): { destroy?: () => void } {
+    node.focus();
+    return {};
+  }
+
+  function handleDialogKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onclose();
+    }
+  }
 </script>
 
 {#if card}
   <div class="scrim" role="presentation" onclick={(event) => event.target === event.currentTarget && onclose()}>
-    <dialog open class="detail-modal" aria-modal="true" aria-labelledby="detail-title">
+    <dialog open autofocus tabindex="-1" use:focusDialog class="detail-modal" aria-modal="true" aria-labelledby="detail-title" onkeydown={handleDialogKeydown}>
       <button class="close icon-button" onclick={onclose} aria-label="Close card details"><X size={17} /></button>
       <div class="detail-art">
         <img src={`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}&format=image&version=normal`} alt={`${card.name} card image`} />
