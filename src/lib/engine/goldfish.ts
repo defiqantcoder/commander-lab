@@ -105,7 +105,7 @@ export class GoldfishSimulator {
    */
   public mulligan(): void {
     this.mulliganCount++;
-    this.library = [...this.library, ...this.hand];
+    this.library.push(...this.hand);
     this.hand = [];
     this.shuffleLibrary();
     this.drawInitialHand();
