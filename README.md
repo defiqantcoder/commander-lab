@@ -188,6 +188,29 @@ export const db = new CommanderLabDB();
   - *Acceptance Criteria:* User changes to cards or deck name persist to IndexedDB on click/debounce; saved decks list updates reactively.
   - *Checks:* Changes survive page refresh in browser.
 
+- **Task C5: Arrow-Key Card Navigation**
+  - *Allowed Files:* `src/lib/components/CardDetailModal.svelte`, `src/lib/components/DeckStudio.svelte`
+  - *Integration Point:* Add global/modal keydown handler:
+    ```svelte
+    <svelte:window onkeydown={(e) => {
+      if (!selectedCard) return;
+      const idx = filteredCards.findIndex(c => c.id === selectedCard.id);
+      if (e.key === 'ArrowRight' && idx < filteredCards.length - 1) {
+        selectedCard = filteredCards[idx + 1];
+      } else if (e.key === 'ArrowLeft' && idx > 0) {
+        selectedCard = filteredCards[idx - 1];
+      } else if (e.key === 'Escape') {
+        selectedCard = null;
+      }
+    }} />
+    ```
+  - *Acceptance Criteria:* When viewing card details, pressing Left/Right arrow keys seamlessly flips to previous/next card without closing modal.
+
+- **Task C6: AI Matchup Sparring Arena UI**
+  - *Allowed Files:* `src/lib/components/MatchupArena.svelte`, `src/lib/components/DeckStudio.svelte`
+  - *Integration Point:* Import `MatchupSimulator` and `EDHREC_BENCHMARK_DECKS` from `$lib/engine/matchup`.
+  - *Acceptance Criteria:* Adds a "Matchup Arena" tab or modal allowing the user to spar their deck against EDHREC Benchmark decks (Krenko Aggro, Talrand Control, Meren Midrange) or their own saved decks. Renders win-rate meter, turn log, and AI improvement recommendations (suggested additions and cuts).
+
 #### 4. Component Integration Cookbook for Copilot
 When implementing bindings in `src/lib/components/DeckStudio.svelte`, `SynergyGraph.svelte`, and `GoldfishView.svelte`, use these pre-tested module contracts:
 
@@ -234,6 +257,19 @@ import { getAllDecks, saveDeck, getDeck } from '$lib/db';
 async function persistCurrentDeck(currentDeck: SavedDeck) {
   await saveDeck(currentDeck);
 }
+
+// 5. AI Matchup Sparring Against EDHREC & Saved Decks ($lib/engine/matchup)
+import { MatchupSimulator, EDHREC_BENCHMARK_DECKS } from '$lib/engine/matchup';
+
+function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[]) {
+  const sim = new MatchupSimulator(userCards, selectedOpponentCards, 'Your Deck', 'EDHREC Benchmark');
+  const report = sim.runMatchupSeries(5);
+  // report.playerWins -> number (e.g. 3)
+  // report.opponentWins -> number (e.g. 2)
+  // report.averageWinningTurn -> number (e.g. 6.2)
+  // report.identifiedWeaknesses -> string[] (e.g. ['Mana Curve Bottleneck on Turn 3'])
+  // report.recommendedImprovements -> { suggestedAdditions, suggestedCuts, coachingAdvice }
+}
 ```
 
 #### 4. Antigravity Next Tasks (Parallel Track)
@@ -249,6 +285,7 @@ async function persistCurrentDeck(currentDeck: SavedDeck) {
 - [x] **Commander Validator**: 100-card color identity, singleton check, banlist verification.
 - [x] **Synergy Engine**: Scoring algorithm and local prompt pipeline for deck evaluation.
 - [x] **Goldfish Simulator Core**: Turn-based state machine for hand draws and mana curves.
+- [x] **Matchup Sparring Engine**: Automated play-testing vs EDHREC benchmarks with AI coaching & cut suggestions.
 
 ---
 

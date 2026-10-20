@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, ArrowDownWideNarrow, ChevronDown, ChevronRight, CircleDollarSign, Filter, Grid2X2, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, TrendingUp, WandSparkles } from 'lucide-svelte';
+  import { Activity, ArrowDownWideNarrow, ChevronDown, ChevronRight, CircleDollarSign, Filter, Grid2X2, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, WandSparkles } from 'lucide-svelte';
   import { getAllDecks, getDeck, saveDeck } from '$lib/db';
   import CardGrid from './CardGrid.svelte';
   import CardDetailModal from './CardDetailModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
+  import MatchupArena from './MatchupArena.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
   import { autocompleteCardName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
   import { auditDeckSaltAndPower, classifyCardRole, generateSynergyGraph, type CardSynergyInput, type SaltScoreAudit, type SynergyGraphData } from '$lib/engine/synergy';
@@ -54,7 +55,7 @@
   let selectedCard = $state<DeckCard | null>(null);
   let leftOpen = $state(true);
   let rightOpen = $state(true);
-  let activeView = $state<'studio' | 'engines' | 'goldfish'>('studio');
+  let activeView = $state<'studio' | 'engines' | 'goldfish' | 'matchup'>('studio');
   let filteredCards = $derived((searchResults ?? cards).filter((card) => (activeRole === 'all' || card.role === activeRole) && (searchResults !== null || card.name.toLowerCase().includes(cardQuery.toLowerCase()))).sort((a, b) => sortBy === 'price' ? (b.currentPriceUsd ?? 0) - (a.currentPriceUsd ?? 0) : sortBy === 'mana' ? a.cmc - b.cmc : a.name.localeCompare(b.name)));
   let deckValue = $derived(cards.reduce((sum, card) => sum + (card.currentPriceUsd ?? 0) * card.quantity, 0));
 
@@ -102,7 +103,6 @@
     if (fingerprint === lastSavedFingerprint) return;
     const timeoutId = setTimeout(() => {
       void persistDeck(fingerprint);
-      saveStatus = 'Saving changes...';
     }, 500);
     return () => clearTimeout(timeoutId);
   });
@@ -158,6 +158,7 @@
 
   async function persistDeck(fingerprint = deckFingerprint()): Promise<void> {
     isSaving = true;
+    saveStatus = 'Saving changes...';
     const storedCards: SavedDeck['cards'] = [
       { id: commander.id, name: commander.name, category: 'commander', quantity: 1, manaCost: commander.manaCost, cmc: commander.cmc, typeLine: commander.typeLine, imageUris: commander.imageUris },
       ...cards.map((card) => ({ id: card.id, name: card.name, category: card.role, quantity: card.quantity, synergyNotes: card.synergyNotes, manaCost: card.manaCost, cmc: card.cmc, typeLine: card.typeLine, imageUris: card.imageUris }))
@@ -187,6 +188,23 @@
   function selectedCardIsInDeck(): boolean {
     const activeCard = selectedCard;
     return activeCard !== null && cards.some((card) => card.id === activeCard.id);
+  }
+
+  function handleDetailKeydown(event: KeyboardEvent): void {
+    const activeCard = selectedCard;
+    if (!activeCard) return;
+
+    if (event.key === 'Escape') {
+      selectedCard = null;
+      return;
+    }
+
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const currentIndex = filteredCards.findIndex((card) => card.id === activeCard.id);
+    const nextIndex = event.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= filteredCards.length) return;
+    event.preventDefault();
+    selectedCard = filteredCards[nextIndex];
   }
 
   async function runCardSearch(query = cardQuery): Promise<void> {
@@ -246,16 +264,20 @@
   function roleCount(role: CardRole): number { return cards.filter((card) => card.role === role).length; }
 </script>
 
+<svelte:window onkeydown={handleDetailKeydown} />
+
 <main class="page-wrap">
   <div class="workspace-heading enter">
     <div><div class="breadcrumb"><span>DECKS</span><ChevronRight size={12} /><span class="current-crumb">{deck.name}</span><i></i><span class="saved-label">{saveStatus}</span></div><h1><input class="deck-name-input" bind:value={deck.name} aria-label="Deck name" /><small>v.04</small></h1><div class="heading-meta"><span class="commander-label"><i></i>Atraxa, Praetors’ Voice</span><b></b><span>{deck.archetype}</span><b></b><span>Updated just now</span></div></div>
     <div class="heading-actions"><button class="subtle-button" onclick={() => activeView = activeView === 'engines' ? 'studio' : 'engines'}><Activity size={13} /> Engine map</button><button class="subtle-button" onclick={() => persistDeck()} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save deck'}</button><button class="primary-button" onclick={analyzeDeck}><WandSparkles size={13} /> Analyze deck</button></div>
   </div>
 
-  <nav class="view-tabs" aria-label="Workspace views"><button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button><button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button><button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button><span></span><div class="identity"><i>W</i><i>U</i><i>B</i><i>G</i></div></nav>
+  <nav class="view-tabs" aria-label="Workspace views"><button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button><button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button><button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button><button class:active={activeView === 'matchup'} onclick={() => activeView = 'matchup'}><Target size={14} /> Matchup Arena</button><span></span><div class="identity"><i>W</i><i>U</i><i>B</i><i>G</i></div></nav>
 
   {#if activeView === 'goldfish'}
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
+  {:else if activeView === 'matchup'}
+    <div class="matchup-view enter"><MatchupArena {cards} {commander} {savedDecks} deckName={deck.name} /></div>
   {:else if activeView === 'engines'}
     <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">Proliferate feedback loop</span><small>{analyzedGraph ? `${analyzedGraph.nodes.length} nodes · ${analyzedGraph.edges.length} links` : `Generated from ${graphCards.length} cards`}</small></div><button class="subtle-button" onclick={analyzeDeck}><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} graphData={analyzedGraph} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div>{#if deckAudit}<div class="audit-summary"><div><span>Power bracket</span><strong>{deckAudit.estimatedPowerBracket} · {deckAudit.estimatedPowerNumber}/10</strong></div><div><span>Average salt</span><strong>{deckAudit.averageSaltScore}</strong></div><div><span>Notable cards</span><strong>{deckAudit.highSaltCards.length}</strong></div></div>{/if}<div class="note"><b>01</b><div><strong>Landfall to proliferate</strong><p>Evolution Sage triggers on each land entering. Fetch lands can create a second trigger in a turn.</p></div></div><div class="note"><b>02</b><div><strong>Counter multiplication</strong><p>Hardened Scales increases initial placement while Atraxa compounds existing counters.</p></div></div><div class="note"><b>03</b><div><strong>Protection gap</strong><p>Two protection effects are recommended before committing Deepglow Skate.</p></div></div></aside></div>
   {:else}
