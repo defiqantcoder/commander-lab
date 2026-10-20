@@ -3,16 +3,17 @@
   import { Focus, GitBranch } from 'lucide-svelte';
   import { writable } from 'svelte/store';
   import { generateSynergyGraph } from '$lib/engine/synergy';
-  import type { SynergyEdge, SynergyNode } from '$lib/engine/synergy';
+  import type { SynergyEdge, SynergyGraphData, SynergyNode } from '$lib/engine/synergy';
   import type { DeckCard } from './types';
 
   export let cards: DeckCard[] = [];
+  export let graphData: SynergyGraphData | null = null;
   const nodes = writable<SynergyNode[]>([]);
   const edges = writable<SynergyEdge[]>([]);
   let nodeCount = 0;
   let edgeCount = 0;
 
-  $: graph = generateSynergyGraph(cards.map((card) => ({
+  $: generatedGraph = generateSynergyGraph(cards.map((card) => ({
     id: card.id,
     name: card.name,
     typeLine: card.typeLine,
@@ -21,6 +22,7 @@
     cmc: card.cmc,
     category: card.role
   })));
+  $: graph = graphData ?? generatedGraph;
   $: nodes.set(toFlowNodes());
   $: edges.set(graph.edges as SynergyEdge[]);
   $: nodeCount = graph.nodes.length;

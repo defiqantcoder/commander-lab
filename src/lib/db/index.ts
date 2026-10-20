@@ -51,10 +51,10 @@ export interface SavedDeck {
   updatedAt: Date;
 }
 
-export interface MarketCacheEntry {
+export interface MarketCacheEntry<T = unknown> {
   id: string; // Scryfall UUID or query string
   name: string;
-  data: any;
+  data: T;
   cachedAt: number; // epoch ms
 }
 
@@ -82,7 +82,7 @@ export interface SimRun {
 export class CommanderLabDB extends Dexie {
   collection!: Table<CollectionCard, string>;
   decks!: Table<SavedDeck, string>;
-  marketCache!: Table<MarketCacheEntry, string>;
+  marketCache!: Table<MarketCacheEntry<unknown>, string>;
   simRuns!: Table<SimRun, string>;
 
   constructor() {

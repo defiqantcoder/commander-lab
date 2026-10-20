@@ -4,6 +4,8 @@
   import CardDetailModal from './CardDetailModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
+  import { autocompleteCardName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
+  import { auditDeckSaltAndPower, classifyCardRole, generateSynergyGraph, type CardSynergyInput, type SaltScoreAudit, type SynergyGraphData } from '$lib/engine/synergy';
   import type { CardRole, DeckCard, SavedDeck } from './types';
 
   const roles: CardRole[] = ['ramp', 'draw', 'engine', 'interaction', 'payoff', 'land'];
@@ -30,14 +32,91 @@
 
   let activeRole = $state<CardRole | 'all'>('all');
   let sortBy = $state('name');
-  let searchCards = $state('');
+  let cardQuery = $state('');
+  let suggestions = $state<string[]>([]);
+  let searchResults = $state<DeckCard[] | null>(null);
+  let searchError = $state('');
+  let isSearching = $state(false);
+  let deckAudit = $state<SaltScoreAudit | null>(null);
+  let analyzedGraph = $state<SynergyGraphData | null>(null);
+  let autocompleteRequestId = 0;
+  let searchRequestId = 0;
   let view = $state<'grid' | 'list'>('grid');
   let selectedCard = $state<DeckCard | null>(null);
   let leftOpen = $state(true);
   let rightOpen = $state(true);
   let activeView = $state<'studio' | 'engines' | 'goldfish'>('studio');
-  let filteredCards = $derived(cards.filter((card) => (activeRole === 'all' || card.role === activeRole) && card.name.toLowerCase().includes(searchCards.toLowerCase())).sort((a, b) => sortBy === 'price' ? (b.currentPriceUsd ?? 0) - (a.currentPriceUsd ?? 0) : sortBy === 'mana' ? a.cmc - b.cmc : a.name.localeCompare(b.name)));
+  let filteredCards = $derived((searchResults ?? cards).filter((card) => (activeRole === 'all' || card.role === activeRole) && card.name.toLowerCase().includes(cardQuery.toLowerCase())).sort((a, b) => sortBy === 'price' ? (b.currentPriceUsd ?? 0) - (a.currentPriceUsd ?? 0) : sortBy === 'mana' ? a.cmc - b.cmc : a.name.localeCompare(b.name)));
   let deckValue = $derived(cards.reduce((sum, card) => sum + (card.currentPriceUsd ?? 0) * card.quantity, 0));
+
+  $effect(() => {
+    const query = cardQuery.trim();
+    if (query.length < 2) {
+      suggestions = [];
+      return;
+    }
+
+    const requestId = ++autocompleteRequestId;
+    const timeoutId = setTimeout(async () => {
+      const names = await autocompleteCardName(query);
+      if (requestId === autocompleteRequestId) suggestions = names;
+    }, 180);
+
+    return () => clearTimeout(timeoutId);
+  });
+
+  function toSynergyInput(card: DeckCard, isCommander = false): CardSynergyInput {
+    return { id: card.id, name: card.name, typeLine: card.typeLine, oracleText: card.oracleText, manaCost: card.manaCost, cmc: card.cmc, category: isCommander ? 'commander' : card.role };
+  }
+
+  function toDeckCard(card: ScryfallCard): DeckCard {
+    const role = classifyCardRole({ id: card.id, name: card.name, typeLine: card.type_line, oracleText: card.oracle_text, manaCost: card.mana_cost, cmc: card.cmc });
+    const price = card.prices.usd ? Number(card.prices.usd) : undefined;
+    return {
+      id: card.id,
+      name: card.name,
+      set: card.set,
+      collectorNumber: card.collector_number,
+      foil: false,
+      quantity: 1,
+      currentPriceUsd: price !== undefined && Number.isFinite(price) ? price : undefined,
+      manaCost: card.mana_cost ?? '',
+      cmc: card.cmc,
+      role,
+      typeLine: card.type_line,
+      oracleText: card.oracle_text,
+      imageUris: card.image_uris
+    };
+  }
+
+  async function runCardSearch(query = cardQuery): Promise<void> {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery || isSearching) return;
+
+    const requestId = ++searchRequestId;
+    isSearching = true;
+    searchError = '';
+    suggestions = [];
+    try {
+      const response = await searchScryfallCards(normalizedQuery);
+      if (requestId !== searchRequestId) return;
+      searchResults = response.data.map(toDeckCard);
+      activeRole = 'all';
+    } catch (error) {
+      if (requestId !== searchRequestId) return;
+      searchResults = [];
+      searchError = error instanceof Error ? error.message : 'Scryfall search failed.';
+    } finally {
+      if (requestId === searchRequestId) isSearching = false;
+    }
+  }
+
+  function analyzeDeck(): void {
+    const analysisCards = [toSynergyInput(commander, true), ...cards.map((card) => toSynergyInput(card))];
+    deckAudit = auditDeckSaltAndPower(analysisCards);
+    analyzedGraph = generateSynergyGraph(analysisCards);
+    activeView = 'engines';
+  }
 
   function roleCount(role: CardRole): number { return cards.filter((card) => card.role === role).length; }
 </script>
@@ -45,7 +124,7 @@
 <main class="page-wrap">
   <div class="workspace-heading enter">
     <div><div class="breadcrumb"><span>DECKS</span><ChevronRight size={12} /><span class="current-crumb">{deck.name}</span><i></i><span class="saved-label">All changes saved</span></div><h1>{deck.name}<small>v.04</small></h1><div class="heading-meta"><span class="commander-label"><i></i>Atraxa, Praetors’ Voice</span><b></b><span>{deck.archetype}</span><b></b><span>Updated just now</span></div></div>
-    <div class="heading-actions"><button class="subtle-button" onclick={() => activeView = activeView === 'engines' ? 'studio' : 'engines'}><Activity size={13} /> Engine map</button><button class="primary-button"><WandSparkles size={13} /> Analyze deck</button></div>
+    <div class="heading-actions"><button class="subtle-button" onclick={() => activeView = activeView === 'engines' ? 'studio' : 'engines'}><Activity size={13} /> Engine map</button><button class="primary-button" onclick={analyzeDeck}><WandSparkles size={13} /> Analyze deck</button></div>
   </div>
 
   <nav class="view-tabs" aria-label="Workspace views"><button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button><button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button><button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button><span></span><div class="identity"><i>W</i><i>U</i><i>B</i><i>G</i></div></nav>
@@ -53,7 +132,7 @@
   {#if activeView === 'goldfish'}
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
   {:else if activeView === 'engines'}
-    <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">Proliferate feedback loop</span><small>Generated from {graphCards.length} cards</small></div><button class="subtle-button"><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div><div class="note"><b>01</b><div><strong>Landfall to proliferate</strong><p>Evolution Sage triggers on each land entering. Fetch lands can create a second trigger in a turn.</p></div></div><div class="note"><b>02</b><div><strong>Counter multiplication</strong><p>Hardened Scales increases initial placement while Atraxa compounds existing counters.</p></div></div><div class="note"><b>03</b><div><strong>Protection gap</strong><p>Two protection effects are recommended before committing Deepglow Skate.</p></div></div></aside></div>
+    <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">Proliferate feedback loop</span><small>{analyzedGraph ? `${analyzedGraph.nodes.length} nodes · ${analyzedGraph.edges.length} links` : `Generated from ${graphCards.length} cards`}</small></div><button class="subtle-button" onclick={analyzeDeck}><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} graphData={analyzedGraph} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div>{#if deckAudit}<div class="audit-summary"><div><span>Power bracket</span><strong>{deckAudit.estimatedPowerBracket} · {deckAudit.estimatedPowerNumber}/10</strong></div><div><span>Average salt</span><strong>{deckAudit.averageSaltScore}</strong></div><div><span>Notable cards</span><strong>{deckAudit.highSaltCards.length}</strong></div></div>{/if}<div class="note"><b>01</b><div><strong>Landfall to proliferate</strong><p>Evolution Sage triggers on each land entering. Fetch lands can create a second trigger in a turn.</p></div></div><div class="note"><b>02</b><div><strong>Counter multiplication</strong><p>Hardened Scales increases initial placement while Atraxa compounds existing counters.</p></div></div><div class="note"><b>03</b><div><strong>Protection gap</strong><p>Two protection effects are recommended before committing Deepglow Skate.</p></div></div></aside></div>
   {:else}
     <div class="workspace" class:left-collapsed={!leftOpen} class:right-collapsed={!rightOpen}>
       {#if leftOpen}
@@ -65,7 +144,8 @@
       {:else}<button class="reopen" onclick={() => leftOpen = true} aria-label="Show commander panels"><PanelLeftClose size={15} /></button>{/if}
 
       <section class="center-rail enter"><section class="panel deck-panel"><div class="panel-heading"><div><span class="panel-title">Deck library</span><small class="library-total">100 cards</small></div><div class="tools"><button class="icon-button" onclick={() => leftOpen = !leftOpen} aria-label="Toggle commander panels"><PanelLeftClose size={14} /></button><button class="icon-button" onclick={() => rightOpen = !rightOpen} aria-label="Toggle insight panels"><PanelRightClose size={14} /></button><button class="icon-button" aria-label="Additional filters"><Filter size={14} /></button></div></div>
-        <div class="filter-toolbar"><label class="card-search"><Search size={13} /><input bind:value={searchCards} placeholder="Filter cards..." aria-label="Filter cards" /></label><div class="role-filters"><button class:filter-active={activeRole === 'all'} onclick={() => activeRole = 'all'}>All <small>{cards.length}</small></button>{#each roles as role}<button class:filter-active={activeRole === role} onclick={() => activeRole = activeRole === role ? 'all' : role}>{role}</button>{/each}</div><div class="filter-controls"><label><ArrowDownWideNarrow size={12} /><select bind:value={sortBy} aria-label="Sort cards"><option value="name">Name</option><option value="mana">Mana value</option><option value="price">Price</option></select></label><button class:chosen={view === 'grid'} aria-label="Grid view" title="Grid view" onclick={() => view = 'grid'}><Grid2X2 size={13} /></button><button class:chosen={view === 'list'} aria-label="List view" title="List view" onclick={() => view = 'list'}><List size={14} /></button></div></div>
+        <div class="filter-toolbar"><div class="search-group"><label class="card-search"><Search size={13} /><input bind:value={cardQuery} list="scryfall-card-suggestions" placeholder="Find or filter cards..." aria-label="Search Scryfall cards" onkeydown={(event) => event.key === 'Enter' && runCardSearch()} /></label><datalist id="scryfall-card-suggestions">{#each suggestions as suggestion}<option value={suggestion}></option>{/each}</datalist><button class="search-submit" onclick={() => runCardSearch()} disabled={isSearching || !cardQuery.trim()} title="Search Scryfall" aria-label="Search Scryfall">{#if isSearching}<span class="search-spinner"></span>{:else}<Search size={13} />{/if}</button></div><div class="role-filters"><button class:filter-active={activeRole === 'all'} onclick={() => activeRole = 'all'}>All <small>{(searchResults ?? cards).length}</small></button>{#each roles as role}<button class:filter-active={activeRole === role} onclick={() => activeRole = activeRole === role ? 'all' : role}>{role}</button>{/each}</div><div class="filter-controls"><label><ArrowDownWideNarrow size={12} /><select bind:value={sortBy} aria-label="Sort cards"><option value="name">Name</option><option value="mana">Mana value</option><option value="price">Price</option></select></label><button class:chosen={view === 'grid'} aria-label="Grid view" title="Grid view" onclick={() => view = 'grid'}><Grid2X2 size={13} /></button><button class:chosen={view === 'list'} aria-label="List view" title="List view" onclick={() => view = 'list'}><List size={14} /></button></div></div>
+        {#if searchError}<p class="search-status error">{searchError}</p>{:else if searchResults}<p class="search-status">Scryfall results for “{cardQuery}” · {searchResults.length} cards</p>{/if}
         <div class="card-summary"><span><i></i>{filteredCards.length} shown</span><span><CircleDollarSign size={12} />${deckValue.toFixed(2)} market value</span></div><CardGrid cards={filteredCards} {view} onselect={(card) => selectedCard = card} /><button class="load-more">Showing {filteredCards.length} of 100 cards <ChevronDown size={13} /></button>
       </section></section>
 
@@ -90,6 +170,8 @@
   .mini-select{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid #303036;border-radius:3px;background:#18181b;color:#777780;font:8px var(--mono)}.curve-content{padding:10px 11px 8px}.curve-total{display:flex;align-items:baseline;gap:8px}.curve-total strong{color:#e4e4e7;font:500 16px var(--mono)}.curve-total small{color:#777780;font-size:8px}.curve-chart{display:grid;height:79px;grid-template-columns:repeat(7,1fr);align-items:end;gap:7px;margin-top:8px}.curve-chart>div{display:grid;height:100%;grid-template-rows:9px 1fr 11px;justify-items:center;align-items:end;gap:3px}.curve-chart small{color:#666671;font:7px var(--mono)}.curve-chart i{width:100%;height:var(--height);align-self:end;border:1px solid #38bdf82b;border-radius:3px 3px 0 0;background:linear-gradient(0deg,#0e749040,#38bdf88f)}.curve-chart>div:nth-child(4) i{background:linear-gradient(0deg,#22c55e22,#22c55e80)}
   .role-list{padding:5px 10px 1px}.role-item{display:grid;width:100%;grid-template-columns:14px 1fr 18px;align-items:center;gap:7px;padding:6px 0;border:0;background:transparent;color:#a1a1aa;font-size:9px;text-align:left;text-transform:capitalize;cursor:pointer}.role-item>b{color:#d4d4d8;font:9px var(--mono);text-align:right}.role-mark{width:12px;height:12px;border:1px solid currentColor;border-radius:4px}.role-ramp{color:#4ade80}.role-draw{color:#7dd3fc}.role-engine{color:#c084fc}.role-interaction{color:#f87171}.role-payoff{color:#fbbf24}.role-track{grid-column:2/4;height:2px;margin-top:-3px;border-radius:2px;background:#29292e}.role-track i{display:block;height:100%;background:currentColor}.bar-ramp{color:#22c55e}.bar-draw{color:#38bdf8}.bar-engine{color:#a855f7}.bar-interaction{color:#ef4444}.bar-payoff{color:#f59e0b}.role-foot,.market-foot{display:flex;justify-content:space-between;margin:2px 10px 9px;padding-top:8px;border-top:1px solid #29292e;color:#777780;font-size:8px}.role-foot b,.market-foot b{color:#a1a1aa;font:8px var(--mono)}
   .center-rail{min-width:0}.deck-panel{overflow:hidden}.panel-heading>div:first-child{display:flex;align-items:center;gap:8px}.library-total{color:#777780;font:8px var(--mono)}.tools{display:flex;gap:1px}.filter-toolbar{display:grid;grid-template-columns:minmax(100px,1fr) auto;gap:8px;padding:9px 11px;border-bottom:1px solid #25252a}.card-search{display:flex;min-width:0;height:28px;align-items:center;gap:6px;padding:0 7px;border:1px solid #303036;border-radius:4px;background:#101013;color:#71717a}.card-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#d4d4d8;font-size:9px}.card-search input::placeholder{color:#666671}.role-filters{display:flex;grid-column:1/-1;gap:4px;overflow:auto;scrollbar-width:none}.role-filters button{min-height:23px;flex:0 0 auto;padding:0 7px;border:1px solid #303036;border-radius:4px;background:#17171a;color:#777780;font-size:8px;text-transform:capitalize;cursor:pointer}.role-filters button.filter-active{border-color:#38bdf855;background:#0e749024;color:#7dd3fc}.role-filters small{color:#666671;font:8px var(--mono)}.filter-controls{display:flex;grid-column:1/-1;align-items:center;justify-content:end;gap:4px}.filter-controls label{display:flex;height:24px;align-items:center;gap:5px;padding:0 6px;border:1px solid #303036;border-radius:4px;color:#71717a}.filter-controls select{width:75px;border:0;outline:0;background:#17171a;color:#a1a1aa;font-size:8px}.filter-controls button{display:grid;width:25px;height:25px;place-items:center;border:1px solid transparent;border-radius:4px;background:transparent;color:#777780;cursor:pointer}.filter-controls button.chosen{border-color:#3a3a41;background:#222226;color:#e4e4e7}.card-summary{display:flex;justify-content:space-between;padding:8px 11px 0;color:#71717a;font:8px var(--mono)}.card-summary span{display:flex;align-items:center;gap:5px}.card-summary span:first-child i{width:5px;height:5px;border-radius:50%;background:#38bdf8}.card-summary span:last-child{color:#a3e635}.load-more{display:flex;width:calc(100% - 22px);min-height:28px;align-items:center;justify-content:center;gap:6px;margin:0 11px 9px;border:1px solid #2d2d33;border-radius:4px;background:#17171a;color:#85858f;font-size:8px}
+  .search-group{display:flex;min-width:0;gap:4px}.search-group .card-search{flex:1}.search-submit{display:grid;width:28px;height:28px;flex:0 0 auto;place-items:center;border:1px solid #303036;border-radius:4px;background:#19191d;color:#7dd3fc;cursor:pointer}.search-submit:disabled{color:#55555e;cursor:default}.search-spinner{width:11px;height:11px;border:1px solid #575760;border-top-color:#7dd3fc;border-radius:50%;animation:search-spin .7s linear infinite}@keyframes search-spin{to{transform:rotate(360deg)}}.search-status{margin:0;padding:7px 11px;border-bottom:1px solid #25252a;color:#8d8d97;font-size:8px}.search-status.error{color:#fca5a5}
+  .audit-summary{display:grid;gap:7px;padding:10px 11px;border-bottom:1px solid #25252a}.audit-summary>div{display:flex;align-items:center;justify-content:space-between;color:#888891;font-size:8px}.audit-summary strong{color:#d4d4d8;font:9px var(--mono)}
   .health-score{color:#bef264;font:10px var(--mono)}.health-metrics{display:grid;gap:9px;padding:11px}.health-metrics>div{display:grid;grid-template-columns:1fr auto;gap:5px;color:#888891;font-size:8px}.health-metrics strong{color:#d4d4d8;font:9px var(--mono)}.health-metrics small{color:#666671;font:8px 'Space Grotesk',sans-serif}.health-metrics>div>i{grid-column:1/-1;height:3px;overflow:hidden;border-radius:3px;background:#2b2b30}.health-metrics>div>i>b{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0e7490,#38bdf8)}.health-foot{display:flex;align-items:center;gap:6px;padding:8px 11px;border-top:1px solid #25252a;color:#71717a;font-size:8px}.health-foot :global(svg){color:#a855f7}.text-action{display:flex;align-items:center;gap:2px;border:0;background:transparent;color:#7dd3fc;font-size:8px;cursor:pointer}.graph-preview{height:188px;overflow:hidden}.graph-preview :global(.graph-shell){min-height:0}.graph-preview :global(.graph-toolbar){height:24px}.graph-preview :global(.flow-stage){height:137px}.graph-preview :global(.graph-legend){min-height:27px;gap:6px;font-size:7px}.graph-preview :global(.chain-count),.graph-preview :global(.svelte-flow__minimap){display:none}.market-value{display:flex;align-items:baseline;gap:8px;padding:11px}.market-value strong{color:#f4f4f5;font:500 18px var(--mono)}.market-value span{color:#a3e635;font:8px var(--mono)}.market-value small{color:#777780;font:8px 'Space Grotesk',sans-serif}.goldfish-teaser{display:flex;width:100%;align-items:center;gap:9px;padding:10px;border:0;background:transparent;text-align:left;cursor:pointer}.goldfish-teaser>i{display:grid;width:30px;height:30px;place-items:center;border:1px solid #38bdf83d;border-radius:5px;background:#0e749021;color:#7dd3fc}.goldfish-teaser>span{display:grid;flex:1;gap:3px}.goldfish-teaser strong{color:#d4d4d8;font-size:9px}.goldfish-teaser small{color:#777780;font-size:8px}.reopen{position:sticky;top:76px;display:grid;width:25px;height:34px;place-items:center;border:1px solid #303036;border-radius:5px;background:#17171a;color:#a1a1aa;cursor:pointer}.page-footer{display:flex;justify-content:space-between;margin-top:17px;padding-top:10px;border-top:1px solid #232328;color:#5e5e68;font:8px var(--mono)}.page-footer span:first-child{display:flex;align-items:center;gap:6px}.page-footer .status-dot{width:5px;height:5px}
   .single-view{width:min(620px,100%);margin:15px auto 0}.engines-view{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(235px,.8fr);align-items:start;gap:11px;padding-top:13px}.engine-panel{overflow:hidden}.engine-panel .panel-heading{min-height:50px}.engine-panel .panel-heading small{display:block;margin-top:3px;color:#777780;font-size:8px}.live{color:#6fce8d!important;font:7px var(--mono)!important}.note{display:grid;grid-template-columns:19px 1fr;gap:8px;padding:11px;border-bottom:1px solid #25252a}.note>b{color:#38bdf8;font:9px var(--mono)}.note strong{color:#d4d4d8;font-size:9px}.note p{margin:5px 0 0;color:#888891;font-size:8px;line-height:1.5}
   @media(min-width:1150px){.filter-toolbar{grid-template-columns:minmax(90px,.7fr) auto}.role-filters{grid-column:auto}.filter-controls{grid-column:1/-1;margin-top:-3px}}

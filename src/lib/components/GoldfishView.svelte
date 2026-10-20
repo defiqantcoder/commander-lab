@@ -41,7 +41,6 @@
     battlefieldCards = [...simulator.battlefield];
     graveyardCards = [...simulator.graveyard];
     commandZoneCards = [...simulator.commandZone];
-    snapshots = [...simulator.turnSnapshots];
     manaAvailable = simulator.manaAvailable;
     manaCapacity = simulator.manaCapacity;
     libraryCount = simulator.library.length;
@@ -52,6 +51,7 @@
     simulator = new GoldfishSimulator(simulatorCards);
     selectedTurn = 0;
     turnActions = [];
+    snapshots = [];
     kept = false;
     syncFromSimulator();
   }
@@ -65,19 +65,17 @@
 
   function advanceTurn(): void {
     if (!kept || simulator.turnNumber >= 5) return;
-    turnActions = simulator.autoPlayTurn();
+    simulator.startTurn();
     selectedTurn = simulator.turnNumber;
+    turnActions = [{ action: 'draw', description: `Turn ${selectedTurn}: untapped and drew a card.` }];
     activeTab = 'hand';
     syncFromSimulator();
+    saveCurrentSnapshot();
   }
 
   function selectTurn(turn: number): void {
-    if (turn > simulator.turnNumber) {
-      if (!kept) return;
-      while (simulator.turnNumber < turn && simulator.turnNumber < 5) simulator.autoPlayTurn();
-      syncFromSimulator();
-    }
-    selectedTurn = Math.min(turn, simulator.turnNumber);
+    if (turn > simulator.turnNumber) return;
+    selectedTurn = turn;
     turnActions = snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.actions ?? [];
   }
 
@@ -106,9 +104,20 @@
 
   function recordManualAction(action: SimTurnAction): void {
     turnActions = [...turnActions, action];
-    snapshots = snapshots.map((snapshot) => snapshot.turnNumber === selectedTurn
-      ? { ...snapshot, hand: handCards.map((card) => card.name), battlefield: battlefieldCards.map((card) => card.name), graveyard: graveyardCards.map((card) => card.name), manaCapacity, manaAvailable, actions: turnActions }
-      : snapshot);
+    saveCurrentSnapshot();
+  }
+
+  function saveCurrentSnapshot(): void {
+    const snapshot: SimTurnSnapshot = {
+      turnNumber: selectedTurn,
+      manaCapacity,
+      manaAvailable,
+      hand: handCards.map((card) => card.name),
+      battlefield: battlefieldCards.map((card) => card.name),
+      graveyard: graveyardCards.map((card) => card.name),
+      actions: [...turnActions]
+    };
+    snapshots = [...snapshots.filter((item) => item.turnNumber !== selectedTurn), snapshot].sort((a, b) => a.turnNumber - b.turnNumber);
   }
 
   untrack(syncFromSimulator);
@@ -129,7 +138,7 @@
 
   <div class="turn-strip" aria-label="Select turn">
     {#each [1, 2, 3, 4, 5] as turn}
-      <button class:current={selectedTurn === turn} class:played={turn <= simulator.turnNumber && turn !== selectedTurn} onclick={() => selectTurn(turn)} disabled={turn > simulator.turnNumber + 1 || (turn > simulator.turnNumber && !kept)} aria-label={`Turn ${turn}`}>
+      <button class:current={selectedTurn === turn} class:played={turn <= simulator.turnNumber && turn !== selectedTurn} onclick={() => selectTurn(turn)} disabled={turn > simulator.turnNumber} aria-label={`Turn ${turn}`}>
         <span>TURN</span><strong>{turn}</strong>
       </button>
     {/each}
@@ -187,7 +196,7 @@
     </div>
   {/if}
 
-  <div class="bench-footer"><span class="simulation-state"><i></i> {selectedTurn === 0 ? 'Opening hand ready' : `${simulator.turnNumber} of 5 turns simulated`}</span><div><button class="advance" disabled={selectedTurn <= 1} onclick={() => selectTurn(selectedTurn - 1)} aria-label="Previous turn"><ChevronLeft size={14} /></button><button class="advance next-turn" disabled={!kept || simulator.turnNumber >= 5} onclick={advanceTurn} aria-label="Advance turn">Advance <ChevronRight size={14} /></button></div></div>
+  <div class="bench-footer"><span class="simulation-state"><i></i> {selectedTurn === 0 ? 'Opening hand ready' : `Turn ${selectedTurn} · ${manaAvailable} mana available`}</span><div><button class="advance" disabled={selectedTurn <= 1} onclick={() => selectTurn(selectedTurn - 1)} aria-label="Previous turn"><ChevronLeft size={14} /></button><button class="advance next-turn" disabled={!kept || simulator.turnNumber >= 5} onclick={advanceTurn} aria-label="Start next turn">{simulator.turnNumber === 0 ? 'Start turn' : 'Next turn'} <ChevronRight size={14} /></button></div></div>
 </section>
 
 <style>

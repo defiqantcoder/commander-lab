@@ -114,7 +114,7 @@ export async function fetchWithCache<T>(cacheKey: string, url: string): Promise<
       }
     }
   } catch (e) {
-    console.warn('Cache lookup failed, proceeding with network fetch:', e);
+    // Cache lookup failed, proceeding with network fetch
   }
 
   // 2. Fetch via rate-limited queue
@@ -147,7 +147,7 @@ export async function fetchWithCache<T>(cacheKey: string, url: string): Promise<
       });
     }
   } catch (e) {
-    console.warn('Failed to cache Scryfall response:', e);
+    // Failed to cache Scryfall response
   }
 
   return data;
