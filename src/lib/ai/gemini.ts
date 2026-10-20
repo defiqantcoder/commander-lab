@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
-export const GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash';
-export const GEMINI_FALLBACK_MODEL = 'gemini-1.5-flash';
+export const GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash';
+export const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 
 export interface ArchetypeSuggestion {
   themeName: string;

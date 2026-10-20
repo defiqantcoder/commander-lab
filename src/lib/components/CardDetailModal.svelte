@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { ArrowDownRight, ExternalLink, Sparkles, X } from 'lucide-svelte';
+  import { ArrowDownRight, Crown, ExternalLink, Sparkles, X } from 'lucide-svelte';
   import type { DeckCard } from './types';
 
   export let card: DeckCard | null = null;
   export let inDeck = false;
   export let ontoggle: (card: DeckCard) => void = () => {};
+  export let onsetcommander: ((card: DeckCard) => void) | undefined = undefined;
   export let onclose: () => void = () => {};
 
   function focusDialog(node: HTMLDialogElement): { destroy?: () => void } {
@@ -34,6 +35,11 @@
         <div class="meta-row"><span class="mana">{card.manaCost}</span><span class="role">{card.role}</span><span class="edition">{card.set.toUpperCase()}</span></div>
         <div class="detail-price"><span>Market price</span><strong>${(card.currentPriceUsd ?? 0).toFixed(2)}</strong>{#if card.foil}<span class="foil"><Sparkles size={13} /> Foil</span>{/if}</div>
         <button class="deck-toggle" class:in-deck={inDeck} onclick={() => ontoggle(card)}>{inDeck ? 'Remove from deck' : 'Add to deck'}</button>
+        {#if onsetcommander && card.typeLine.toLowerCase().includes('legendary') && card.role !== 'commander'}
+          <button class="set-commander-btn" onclick={() => { if (card) onsetcommander(card); onclose(); }}>
+            <Crown size={12} /> Set as Deck Commander
+          </button>
+        {/if}
         <section class="note-block">
           <div class="block-title"><Sparkles size={14} /> Synergy note</div>
           <p>{card.synergyNotes ?? 'Supports the deck’s core plan by adding another layer of value to the counter and proliferate engine.'}</p>
@@ -71,6 +77,8 @@
   .deck-toggle { min-height:32px; margin:0 0 17px; border:1px solid #3f3f46; border-radius:5px; background:#1b1b20; color:#d4d4d8; font-size:10px; cursor:pointer; }
   .deck-toggle:hover { border-color:#38bdf8; color:#bae6fd; }
   .deck-toggle.in-deck { border-color:#28543d; color:#86efac; }
+  .set-commander-btn { min-height: 32px; margin: -7px 0 17px; border: 1px solid #ca8a0466; border-radius: 5px; background: #713f1230; color: #fef08a; font-size: 10px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .set-commander-btn:hover { background: #713f1260; border-color: #facc15; }
   .foil { display: inline-flex; align-items: center; gap: 4px; color: #e879f9; font-size: 10px; }
   .note-block, .replacement-block { margin-bottom: 16px; }
   .block-title { display: flex; align-items: center; gap: 7px; color: #d4d4d8; font-size: 11px; font-weight: 600; }

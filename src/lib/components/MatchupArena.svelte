@@ -46,7 +46,7 @@
 
   let opponentOptions = $derived([
     ...EDHREC_BENCHMARK_DECKS.map((benchmark) => ({ id: benchmark.id, name: benchmark.name, description: benchmark.description, cards: benchmark.cards })),
-    ...savedDecks.filter((savedDeck) => savedDeck.id !== 'deck-atraxa-proliferate').map((savedDeck) => ({
+    ...savedDecks.filter((savedDeck) => savedDeck.name.toLowerCase() !== deckName.toLowerCase()).map((savedDeck) => ({
       id: `saved:${savedDeck.id}`,
       name: savedDeck.name,
       description: `Saved deck · ${savedDeck.archetype}`,
@@ -120,7 +120,7 @@
         </optgroup>
         {#if savedDecks.length > 1}
           <optgroup label="Saved decks">
-            {#each savedDecks.filter((savedDeck) => savedDeck.id !== 'deck-atraxa-proliferate') as savedDeck (savedDeck.id)}
+            {#each savedDecks.filter((savedDeck) => savedDeck.name.toLowerCase() !== deckName.toLowerCase()) as savedDeck (savedDeck.id)}
               <option value={`saved:${savedDeck.id}`}>{savedDeck.name}</option>
             {/each}
           </optgroup>

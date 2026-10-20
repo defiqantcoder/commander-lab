@@ -1,16 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, ArrowDownWideNarrow, Check, ChevronDown, ChevronRight, CircleDollarSign, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
+  import { Activity, ArrowDownWideNarrow, BookOpen, Check, ChevronDown, ChevronRight, CircleDollarSign, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
   import { getAllDecks, getDeck, saveDeck } from '$lib/db';
   import CardGrid from './CardGrid.svelte';
   import CardDetailModal from './CardDetailModal.svelte';
   import ApiKeyModal from './ApiKeyModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
   import MatchupArena from './MatchupArena.svelte';
+  import PilotGuide from './PilotGuide.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
   import { getGeminiApiKey } from '$lib/ai/gemini';
   import { autocompleteCardName, getCardByName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
   import { auditDeckSaltAndPower, classifyCardRole, generateSynergyGraph, type CardSynergyInput, type SaltScoreAudit, type SynergyGraphData } from '$lib/engine/synergy';
+  import { detectDynamicSynergyPlays } from '$lib/engine/playbook';
   import { manaSymbols, type CardRole, type DeckCard, type SavedDeck } from './types';
 
   const roles: CardRole[] = ['ramp', 'draw', 'engine', 'interaction', 'payoff', 'land'];
@@ -75,7 +77,8 @@
   let selectedCard = $state<DeckCard | null>(null);
   let leftOpen = $state(true);
   let rightOpen = $state(true);
-  let activeView = $state<'studio' | 'engines' | 'goldfish' | 'matchup'>('studio');
+  let activeView = $state<'studio' | 'engines' | 'goldfish' | 'matchup' | 'playbook'>('studio');
+  let dynamicSynergyPlays = $derived(detectDynamicSynergyPlays(cards.map(c => ({ id: c.id, name: c.name, typeLine: c.typeLine, cmc: c.cmc, manaCost: c.manaCost, oracleText: c.oracleText, category: c.role })), { id: commander.id, name: commander.name, typeLine: commander.typeLine, cmc: commander.cmc, manaCost: commander.manaCost, oracleText: commander.oracleText, category: 'commander', isCommander: true }));
   let isChangingCommander = $state(false);
   let commanderQuery = $state('');
   let commanderSuggestions = $state<string[]>([]);
@@ -365,6 +368,23 @@
       : [...cards, card];
   }
 
+  function setDeckCommander(card: DeckCard): void {
+    const previousCommander = { ...commander, role: 'payoff' as CardRole };
+    commander = {
+      ...card,
+      role: 'commander',
+      quantity: 1
+    };
+    cards = cards.filter((item) => item.name.toLowerCase() !== card.name.toLowerCase());
+    if (!cards.some((item) => item.name.toLowerCase() === previousCommander.name.toLowerCase())) {
+      cards = [...cards, previousCommander];
+    }
+    deck.commanderId = commander.id;
+    deck.commanderName = commander.name;
+    saveStatus = `Set ${commander.name} as Commander`;
+    void persistDeck();
+  }
+
   function selectedCardIsInDeck(): boolean {
     const activeCard = selectedCard;
     return activeCard !== null && cards.some((card) => card.id === activeCard.id);
@@ -586,8 +606,9 @@
   </div>
 
   <nav class="view-tabs" aria-label="Workspace views">
-    <button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button>
+    <button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>{cards.length}</small></button>
     <button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button>
+    <button class:active={activeView === 'playbook'} onclick={() => activeView = 'playbook'}><BookOpen size={14} /> Pilot Guide</button>
     <button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button>
     <button class:active={activeView === 'matchup'} onclick={() => activeView = 'matchup'}><Target size={14} /> Matchup Arena</button>
     <span></span>
@@ -602,12 +623,14 @@
     </div>
   </nav>
 
-  {#if activeView === 'goldfish'}
+  {#if activeView === 'playbook'}
+    <div class="single-view enter"><PilotGuide {cards} {commander} deckName={deck.name} archetype={deck.archetype} /></div>
+  {:else if activeView === 'goldfish'}
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
   {:else if activeView === 'matchup'}
     <div class="matchup-view enter"><MatchupArena {cards} {commander} {savedDecks} deckName={deck.name} onApplyAddition={applyArenaAddition} onApplyCut={applyArenaCut} /></div>
   {:else if activeView === 'engines'}
-    <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">Proliferate feedback loop</span><small>{analyzedGraph ? `${analyzedGraph.nodes.length} nodes · ${analyzedGraph.edges.length} links` : `Generated from ${graphCards.length} cards`}</small></div><button class="subtle-button" onclick={analyzeDeck}><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} graphData={analyzedGraph} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div>{#if deckAudit}<div class="audit-summary"><div><span>Power bracket</span><strong>{deckAudit.estimatedPowerBracket} · {deckAudit.estimatedPowerNumber}/10</strong></div><div><span>Average salt</span><strong>{deckAudit.averageSaltScore}</strong></div><div><span>Notable cards</span><strong>{deckAudit.highSaltCards.length}</strong></div></div>{/if}<div class="note"><b>01</b><div><strong>Landfall to proliferate</strong><p>Evolution Sage triggers on each land entering. Fetch lands can create a second trigger in a turn.</p></div></div><div class="note"><b>02</b><div><strong>Counter multiplication</strong><p>Hardened Scales increases initial placement while Atraxa compounds existing counters.</p></div></div><div class="note"><b>03</b><div><strong>Protection gap</strong><p>Two protection effects are recommended before committing Deepglow Skate.</p></div></div></aside></div>
+    <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">{deck.archetype} feedback loop</span><small>{analyzedGraph ? `${analyzedGraph.nodes.length} nodes · ${analyzedGraph.edges.length} links` : `Generated from ${graphCards.length} cards`}</small></div><button class="subtle-button" onclick={analyzeDeck}><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} graphData={analyzedGraph} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div>{#if deckAudit}<div class="audit-summary"><div><span>Power bracket</span><strong>{deckAudit.estimatedPowerBracket} · {deckAudit.estimatedPowerNumber}/10</strong></div><div><span>Average salt</span><strong>{deckAudit.averageSaltScore}</strong></div><div><span>Notable cards</span><strong>{deckAudit.highSaltCards.length}</strong></div></div>{/if}{#if dynamicSynergyPlays.length > 0}{#each dynamicSynergyPlays.slice(0, 3) as play, i}<div class="note"><b>0{i + 1}</b><div><strong>{play.title}</strong><p>{play.description} {play.tacticalTip}</p></div></div>{/each}{:else}<div class="note"><b>01</b><div><strong>Core Commander Synergies</strong><p>Deploy {commander.name} on curve to anchor the deck’s primary engine loop.</p></div></div><div class="note"><b>02</b><div><strong>Mana Curve Acceleration</strong><p>Prioritize 1–2 CMC ramp to accelerate into early payoffs.</p></div></div><div class="note"><b>03</b><div><strong>Interaction Timing</strong><p>Save targeted interaction for game-ending opponent combo lines.</p></div></div>{/if}</aside></div>
   {:else}
     <div class="workspace" class:left-collapsed={!leftOpen} class:right-collapsed={!rightOpen}>
       {#if leftOpen}
@@ -716,7 +739,7 @@
   <footer class="page-footer"><span><i class="status-dot"></i>Local workspace · nothing leaves this device</span><span>COMMANDER LAB · STUDIO 04</span></footer>
 </main>
 
-<CardDetailModal card={selectedCard} inDeck={selectedCardIsInDeck()} ontoggle={toggleDeckCard} onclose={() => selectedCard = null} />
+<CardDetailModal card={selectedCard} inDeck={selectedCardIsInDeck()} ontoggle={toggleDeckCard} onsetcommander={setDeckCommander} onclose={() => selectedCard = null} />
 
 {#if showIOModal}
   <div class="scrim" role="presentation" onclick={(e) => e.target === e.currentTarget && (showIOModal = false)}>

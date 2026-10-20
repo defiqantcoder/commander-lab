@@ -2,7 +2,7 @@
 ### Interactive MTG Commander Architect & Market Intelligence
 
 **Status:** Approved & Fully Expanded  
-**Primary Engine:** Gemini 2.5 Flash / Standard Tier (with Local Heuristic Engine)  
+**Primary Engine:** Gemini 3.8 Flash / Standard Tier (with Local Heuristic Engine)  
 **Form Factor:** Local-First Progressive Web App (PWA)  
 **Target Environment:** HP Envy Laptop & Google Pixel Fold  
 
@@ -22,7 +22,7 @@ Commander Lab is a zero-cost, local-first Progressive Web App (PWA) engineered s
    - **Google Pixel 10 Pro Fold:** Adaptive dual-pane layout when unfolded—interactive node graph on the left panel with card art and role breakdowns on the right. Installs as an edge-to-edge standalone PWA.
 3. **Direct Client-to-API Communication:**
    - Communicates directly with the CORS-friendly Scryfall REST API for card metadata, imagery, and pricing.
-   - AI synergy queries and deck generation prompts route directly to Gemini 2.5 Flash using a client-side API key stored locally in `localStorage` or retrieved via environment variables, with offline fallback heuristics.
+   - AI synergy queries and deck generation prompts route directly to Gemini 3.8 Flash using a client-side API key stored locally in `localStorage` or retrieved via environment variables, with offline fallback heuristics.
 
 ---
 
@@ -35,7 +35,7 @@ Commander Lab is a zero-cost, local-first Progressive Web App (PWA) engineered s
 | **Local Database** | Dexie.js (IndexedDB wrapper) | Client-side tables: `collection`, `decks`, `market_cache`, `sim_runs` |
 | **Synergy Visualizer** | `@xyflow/svelte` (Svelte Flow) | Interactive node-edge flowchart mapping combo loops & win-cons |
 | **External APIs** | Scryfall REST API | Card lookup, syntax search, live USD pricing, reprint data |
-| **AI Reasoning Engine**| Google GenAI SDK (`gemini-2.5-flash`) | Multi-turn reasoning, obscure rule graph evaluations, JSON schemas |
+| **AI Reasoning Engine**| Google GenAI SDK (`gemini-3.8-flash`) | Multi-turn reasoning, obscure rule graph evaluations, JSON schemas |
 
 ---
 
@@ -173,6 +173,9 @@ export const db = new CommanderLabDB();
 - **[x] Task C7: Matchup Arena One-Click Recommendation Swaps** *(Completed by Antigravity)*
 - **[x] Task C8: Deck Import & Export (MTGO / Arena / Plain Text Format)** *(Completed by Antigravity)*
 - **[x] Task C9: Keyboard Navigation Tooltips & Shortcuts Guide** *(Completed by Antigravity)*
+- **[x] Task C10: Universal Commander Architecture & Dynamic Deck Playbook** *(Completed by Antigravity)*
+  - *Dynamic Commander*: Swapping/setting ANY legendary creature as Commander, dynamic color identities, and dynamic feedback loops.
+  - *Piloting Guide*: Comprehensive turn-by-turn gameplans (Early/Mid/Late), master combo registry with step-by-step walkthroughs and disruption windows, high-synergy plays, and mulligan/recovery guides.
 
 > [!NOTE]
 > **Full-Stack Ownership Transition:** As Copilot's balance winds down, Antigravity has assumed full-stack ownership across both UI components (`src/lib/components/`, `src/routes/`, `src/app.css`) and backend engine/data layers (`src/lib/engine/`, `src/lib/db/`, `src/lib/api/`, `src/lib/ai/`). Antigravity periodically checks `README.md` for unfinished notes and drives all architecture directly to completion.
