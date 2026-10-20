@@ -163,53 +163,27 @@ export const db = new CommanderLabDB();
   - `src/**/*.test.ts`
   - Root config (`package.json`, `svelte.config.js`, `vite.config.ts`, `tsconfig.json`)
 
-#### 3. Copilot Next Tasks (Prioritized)
-- **Task C1: Interactive Scryfall Search & Autocomplete in Studio**
-  - *Allowed Files:* `src/lib/components/DeckStudio.svelte`, `src/lib/components/CardGrid.svelte`
-  - *Integration Point:* Import `autocompleteCardName(query)` and `searchCards(query)` from `$lib/api/scryfall`.
-  - *Acceptance Criteria:* Typing in the search bar triggers live autocomplete dropdown with keyboard navigation and click-to-select, updating the displayed card listing.
-  - *Checks:* Svelte component reactivity; no direct API fetches (always use `$lib/api/scryfall`).
+#### 3. Copilot Task Progress & Next Cycle Directives
+- **[x] Task C1: Live Scryfall Search & Autocomplete** *(Completed by Copilot)*
+- **[x] Task C2: Dynamic Svelte Flow Node-Graph Binding** *(Completed by Copilot)*
+- **[x] Task C3: Goldfish Simulator State Machine Integration** *(Completed by Copilot)*
+- **[x] Task C4: Local Deck Persistence via Dexie** *(Completed by Copilot)*
+- **[x] Task C5: Arrow-Key Card Navigation** *(Completed by Copilot)*
+- **[x] Task C6: AI Matchup Sparring Arena UI** *(Completed by Copilot)*
 
-- **Task C2: Dynamic Svelte Flow Node-Graph Binding**
-  - *Allowed Files:* `src/lib/components/SynergyGraph.svelte`
-  - *Integration Point:* Import `generateSynergyGraph(cards)` from `$lib/engine/synergy`.
-  - *Acceptance Criteria:* Passing `graphCards` generates custom Svelte Flow nodes (Commander root, Combo piece, Engine, Payoff) with animated combo edges in the canvas instead of hardcoded coordinates.
-  - *Checks:* Visual pan/zoom functional; handles empty or 1-card decks gracefully without crashing.
-
-- **Task C3: Goldfish Simulator State Machine Integration**
-  - *Allowed Files:* `src/lib/components/GoldfishView.svelte`
-  - *Integration Point:* Instantiate `new GoldfishSimulator(deckCards)` from `$lib/engine/goldfish`.
-  - *Acceptance Criteria:* "Mulligan" button triggers `sim.mulligan()`; "Next Turn" button executes `sim.autoPlayTurn()`; displays hand quality rating ("Excellent" / "Good" / "Risky" / "Unplayable") and mana progression curve.
-  - *Checks:* Turn steps up through Turn 5, showing updated battlefield and mana capacity.
-
-- **Task C4: Local Deck Persistence via Dexie**
-  - *Allowed Files:* `src/lib/components/DeckStudio.svelte`
-  - *Integration Point:* Import `saveDeck`, `loadDeck`, `getAllDecks` from `$lib/db`.
-  - *Acceptance Criteria:* User changes to cards or deck name persist to IndexedDB on click/debounce; saved decks list updates reactively.
-  - *Checks:* Changes survive page refresh in browser.
-
-- **Task C5: Arrow-Key Card Navigation**
-  - *Allowed Files:* `src/lib/components/CardDetailModal.svelte`, `src/lib/components/DeckStudio.svelte`
-  - *Integration Point:* Add global/modal keydown handler:
-    ```svelte
-    <svelte:window onkeydown={(e) => {
-      if (!selectedCard) return;
-      const idx = filteredCards.findIndex(c => c.id === selectedCard.id);
-      if (e.key === 'ArrowRight' && idx < filteredCards.length - 1) {
-        selectedCard = filteredCards[idx + 1];
-      } else if (e.key === 'ArrowLeft' && idx > 0) {
-        selectedCard = filteredCards[idx - 1];
-      } else if (e.key === 'Escape') {
-        selectedCard = null;
-      }
-    }} />
-    ```
-  - *Acceptance Criteria:* When viewing card details, pressing Left/Right arrow keys seamlessly flips to previous/next card without closing modal.
-
-- **Task C6: AI Matchup Sparring Arena UI**
+- **Task C7: Matchup Arena One-Click Recommendation Swaps**
   - *Allowed Files:* `src/lib/components/MatchupArena.svelte`, `src/lib/components/DeckStudio.svelte`
-  - *Integration Point:* Import `MatchupSimulator` and `EDHREC_BENCHMARK_DECKS` from `$lib/engine/matchup`.
-  - *Acceptance Criteria:* Adds a "Matchup Arena" tab or modal allowing the user to spar their deck against EDHREC Benchmark decks (Krenko Aggro, Talrand Control, Meren Midrange) or their own saved decks. Renders win-rate meter, turn log, and AI improvement recommendations (suggested additions and cuts).
+  - *Integration Point:* Pass an `onApplyRecommendation?: (addition: string, cut: string) => void` callback from `DeckStudio` to `MatchupArena`.
+  - *Acceptance Criteria:* In the sparring report recommendation section, clicking "Apply Recommendation" automatically removes the cut card and searches/adds the recommended addition to the deck list.
+
+- **Task C8: Deck Import & Export (MTGO / Arena / Plain Text Format)**
+  - *Allowed Files:* `src/lib/components/DeckStudio.svelte`
+  - *Integration Point:* Add an "Export / Import" modal or drawer. Parses standard MTG decklist text (`1 Sol Ring\n1 Mana Crypt...`) using Scryfall API to populate `cards`, and formats current `cards` to standard clipboard-ready text.
+  - *Acceptance Criteria:* User can copy complete 100-card decklist to clipboard in standard format and paste external lists to instantly build deck.
+
+- **Task C9: Keyboard Navigation Tooltips & Shortcuts Guide**
+  - *Allowed Files:* `src/lib/components/CardDetailModal.svelte`, `src/lib/components/DeckStudio.svelte`
+  - *Acceptance Criteria:* Display elegant badge pill hints (e.g. `<kbd>←</kbd> <kbd>→</kbd> Navigate`, `<kbd>Esc</kbd> Close`) in the card modal footer so users discover keyboard navigation seamlessly.
 
 #### 4. Component Integration Cookbook for Copilot
 When implementing bindings in `src/lib/components/DeckStudio.svelte`, `SynergyGraph.svelte`, and `GoldfishView.svelte`, use these pre-tested module contracts:
@@ -273,15 +247,15 @@ function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[])
 ```
 
 #### 4. Antigravity Next Tasks (Parallel Track)
-- **Task A1:** Review, test, and merge Jules PRs #5 through #14 into `main`.
-- **Task A2:** Add Dexie offline mock tests and verify browser storage edge cases.
-- **Task A3:** Maintain green test suite across all engine and API contracts.
+- **[x] Task A1:** Review, test, and merge all Jules PRs (#1 through #26) into `main`. *(Completed)*
+- **[x] Task A2:** Add Dexie offline mock tests and verify browser storage edge cases. *(Completed)*
+- **[x] Task A3:** Maintain green test suite across all engine and API contracts (42/42 tests passing). *(Completed)*
 
 ---
 
 ### Antigravity Track (Data, Engine & Logic)
 - **Domain:** `src/lib/engine/`, `src/lib/db/`, `src/lib/api/`, test suites
-- [x] **Scryfall Cache & Dexie Store**: Ingestion schema, rate limiter, IndexedDB persistence.
+- [x] **Scryfall Cache & Dexie Store**: Ingestion schema, rate limiter, IndexedDB persistence (with offline Dexie unit tests).
 - [x] **Commander Validator**: 100-card color identity, singleton check, banlist verification.
 - [x] **Synergy Engine**: Scoring algorithm and local prompt pipeline for deck evaluation.
 - [x] **Goldfish Simulator Core**: Turn-based state machine for hand draws and mana curves.
@@ -291,10 +265,11 @@ function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[])
 
 ### Copilot Track (UI, Components & Layouts)
 - **Domain:** `src/routes/`, `src/lib/components/`, `src/app.css`
-- [/] **Main Dashboard Shell**: SvelteKit responsive layouts and workspace grid.
-- [ ] **Deck List & Card Modals**: Visual card view, mana cost pips, category sorting.
-- [ ] **Synergy Graph Component**: Visual node/flowchart display for card interactions.
-- [ ] **Goldfish View**: Interactive play-testing dashboard and turn tracker UI.
+- [x] **Main Dashboard Shell**: SvelteKit responsive layouts and workspace grid (`DeckStudio.svelte`).
+- [x] **Deck List & Card Modals**: Visual card view, mana cost pips, category sorting, arrow-key card navigation (`CardDetailModal.svelte`).
+- [x] **Synergy Graph Component**: Visual node/flowchart display for card interactions (`SynergyGraph.svelte`).
+- [x] **Goldfish View**: Interactive play-testing dashboard and turn tracker UI (`GoldfishView.svelte`).
+- [x] **Matchup Arena UI**: Sparring against EDHREC benchmarks and saved decks with AI coaching (`MatchupArena.svelte`).
 
 ---
 
