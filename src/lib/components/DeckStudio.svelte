@@ -1,19 +1,39 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, ArrowDownWideNarrow, Check, ChevronDown, ChevronRight, CircleDollarSign, Copy, Download, FileText, Filter, Grid2X2, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
+  import { Activity, ArrowDownWideNarrow, Check, ChevronDown, ChevronRight, CircleDollarSign, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
   import { getAllDecks, getDeck, saveDeck } from '$lib/db';
   import CardGrid from './CardGrid.svelte';
   import CardDetailModal from './CardDetailModal.svelte';
+  import ApiKeyModal from './ApiKeyModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
   import MatchupArena from './MatchupArena.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
+  import { getGeminiApiKey } from '$lib/ai/gemini';
   import { autocompleteCardName, getCardByName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
   import { auditDeckSaltAndPower, classifyCardRole, generateSynergyGraph, type CardSynergyInput, type SaltScoreAudit, type SynergyGraphData } from '$lib/engine/synergy';
-  import type { CardRole, DeckCard, SavedDeck } from './types';
+  import { manaSymbols, type CardRole, type DeckCard, type SavedDeck } from './types';
 
   const roles: CardRole[] = ['ramp', 'draw', 'engine', 'interaction', 'payoff', 'land'];
   let deck = $state<SavedDeck>({ id: 'deck-atraxa-proliferate', name: 'The Long Game', commanderId: 'atraxa-praetors-voice', commanderName: 'Atraxa, Praetors’ Voice', archetype: 'Proliferate / Counters', saltScore: 3.4, cards: [], updatedAt: new Date('2026-10-18T12:00:00') });
-  const commander: DeckCard = { id: 'commander-atraxa', name: 'Atraxa, Praetors’ Voice', set: '2x2', collectorNumber: '190', foil: false, quantity: 1, currentPriceUsd: 17.42, manaCost: '{3}{W}{U}{B}{G}', cmc: 4, role: 'commander', typeLine: 'Legendary Creature — Phyrexian Angel Horror', oracleText: 'Flying, vigilance, deathtouch, lifelink. At the beginning of your end step, proliferate.' };
+  let commander = $state<DeckCard>({
+    id: 'commander-atraxa',
+    name: 'Atraxa, Praetors’ Voice',
+    set: '2x2',
+    collectorNumber: '190',
+    foil: false,
+    quantity: 1,
+    currentPriceUsd: 17.42,
+    manaCost: '{3}{W}{U}{B}{G}',
+    cmc: 4,
+    role: 'commander',
+    typeLine: 'Legendary Creature — Phyrexian Angel Horror',
+    oracleText: 'Flying, vigilance, deathtouch, lifelink. At the beginning of your end step, proliferate.',
+    colorIdentity: ['W', 'U', 'B', 'G'],
+    imageUris: {
+      art_crop: 'https://api.scryfall.com/cards/named?exact=Atraxa%2C%20Praetors%E2%80%99%20Voice&format=image&version=art_crop',
+      normal: 'https://api.scryfall.com/cards/named?exact=Atraxa%2C%20Praetors%E2%80%99%20Voice&format=image&version=normal'
+    }
+  });
   let cards = $state<DeckCard[]>([
     { id: 'c1', name: 'Hardened Scales', set: 'ktk', collectorNumber: '133', foil: false, quantity: 1, currentPriceUsd: 7.82, manaCost: '{G}', cmc: 1, role: 'engine', typeLine: 'Enchantment', synergyNotes: 'Adds an extra counter to each counter-placement event, compounding every proliferate trigger.', budgetReplacement: 'Conclave Mentor' },
     { id: 'c2', name: 'Evolution Sage', set: 'war', collectorNumber: '159', foil: true, quantity: 1, currentPriceUsd: 1.34, manaCost: '{2}{G}', cmc: 3, role: 'engine', typeLine: 'Creature — Elf Druid', oracleText: 'Landfall — Whenever a land enters the battlefield under your control, proliferate.', synergyNotes: 'Turns each land drop into a proliferate trigger, making fetch lands especially valuable.' },
@@ -56,16 +76,58 @@
   let leftOpen = $state(true);
   let rightOpen = $state(true);
   let activeView = $state<'studio' | 'engines' | 'goldfish' | 'matchup'>('studio');
+  let isChangingCommander = $state(false);
+  let commanderQuery = $state('');
+  let commanderSuggestions = $state<string[]>([]);
+  let activeCommanderSuggestionIndex = $state(-1);
+  let isSearchingCommander = $state(false);
+  let commanderSearchError = $state('');
+  let commanderAutocompleteRequestId = 0;
   let filteredCards = $derived((searchResults ?? cards).filter((card) => (activeRole === 'all' || card.role === activeRole) && (searchResults !== null || card.name.toLowerCase().includes(cardQuery.toLowerCase()))).sort((a, b) => sortBy === 'price' ? (b.currentPriceUsd ?? 0) - (a.currentPriceUsd ?? 0) : sortBy === 'mana' ? a.cmc - b.cmc : a.name.localeCompare(b.name)));
   let deckValue = $derived(cards.reduce((sum, card) => sum + (card.currentPriceUsd ?? 0) * card.quantity, 0));
 
+  let showApiKeyModal = $state(false);
+  let hasApiKey = $state(false);
+
   onMount(async () => {
+    hasApiKey = !!getGeminiApiKey();
     try {
       savedDecks = await getAllDecks();
       const storedDeck = await getDeck(deck.id);
       if (storedDeck) {
         deck = storedDeck;
         cards = storedDeck.cards.filter((entry) => entry.category !== 'commander').map(toDeckCardEntry);
+        const commanderEntry = storedDeck.cards.find((entry) => entry.category === 'commander');
+        if (commanderEntry) {
+          commander = {
+            id: commanderEntry.id,
+            name: commanderEntry.name,
+            set: '',
+            collectorNumber: '',
+            foil: false,
+            quantity: 1,
+            manaCost: commanderEntry.manaCost ?? '',
+            cmc: commanderEntry.cmc ?? 0,
+            role: 'commander',
+            typeLine: commanderEntry.typeLine ?? 'Legendary Creature',
+            oracleText: '',
+            imageUris: commanderEntry.imageUris,
+            colorIdentity: commanderEntry.colorIdentity ?? []
+          };
+          if (!commanderEntry.imageUris?.art_crop || !commanderEntry.colorIdentity?.length) {
+            getCardByName(commanderEntry.name).then((sc) => {
+              if (sc && commander.name === commanderEntry.name) {
+                applyScryfallToCommander(sc);
+              }
+            }).catch(() => {});
+          }
+        } else if (storedDeck.commanderName) {
+          getCardByName(storedDeck.commanderName).then((sc) => {
+            if (sc && deck.commanderName === storedDeck.commanderName) {
+              applyScryfallToCommander(sc);
+            }
+          }).catch(() => {});
+        }
       }
     } catch (error) {
       console.warn('Unable to load saved decks:', error);
@@ -98,14 +160,130 @@
   });
 
   $effect(() => {
+    const query = commanderQuery.trim();
+    if (query.length < 2) {
+      commanderSuggestions = [];
+      activeCommanderSuggestionIndex = -1;
+      return;
+    }
+
+    commanderSuggestions = [];
+    activeCommanderSuggestionIndex = -1;
+    const reqId = ++commanderAutocompleteRequestId;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const names = await autocompleteCardName(query);
+        if (reqId === commanderAutocompleteRequestId) {
+          commanderSuggestions = names;
+          activeCommanderSuggestionIndex = names.length > 0 ? 0 : -1;
+        }
+      } catch {
+        if (reqId === commanderAutocompleteRequestId) {
+          commanderSuggestions = [];
+        }
+      }
+    }, 180);
+
+    return () => clearTimeout(timeoutId);
+  });
+
+  $effect(() => {
     if (!persistenceReady) return;
-    const fingerprint = JSON.stringify({ name: deck.name, archetype: deck.archetype, cards: cards.map((card) => `${card.id}:${card.quantity}:${card.role}`) });
+    const fingerprint = deckFingerprint();
     if (fingerprint === lastSavedFingerprint) return;
     const timeoutId = setTimeout(() => {
       void persistDeck(fingerprint);
     }, 500);
     return () => clearTimeout(timeoutId);
   });
+
+  function pipClass(symbol: string): string {
+    const s = symbol.toUpperCase();
+    if (s === 'W') return 'pip-white';
+    if (s === 'U') return 'pip-blue';
+    if (s === 'B') return 'pip-black';
+    if (s === 'R') return 'pip-red';
+    if (s === 'G') return 'pip-green';
+    if (s === 'C') return 'pip-colorless';
+    return 'pip-generic';
+  }
+
+  function applyScryfallToCommander(card: ScryfallCard): void {
+    const imageArtCrop = card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop;
+    const imageNormal = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+    const imageSmall = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small;
+    const cost = card.mana_cost ?? card.card_faces?.[0]?.mana_cost ?? '';
+    const oracle = card.oracle_text ?? card.card_faces?.map((f) => f.oracle_text).filter(Boolean).join('\n//\n') ?? '';
+    const price = card.prices.usd ? Number(card.prices.usd) : undefined;
+
+    commander = {
+      id: card.id,
+      name: card.name,
+      set: card.set,
+      collectorNumber: card.collector_number,
+      foil: false,
+      quantity: 1,
+      currentPriceUsd: price !== undefined && Number.isFinite(price) ? price : undefined,
+      manaCost: cost,
+      cmc: card.cmc,
+      role: 'commander',
+      typeLine: card.type_line,
+      oracleText: oracle,
+      colorIdentity: card.color_identity,
+      imageUris: {
+        art_crop: imageArtCrop,
+        normal: imageNormal,
+        small: imageSmall
+      }
+    };
+  }
+
+  async function selectCommander(name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    isSearchingCommander = true;
+    commanderSearchError = '';
+    try {
+      const card = await getCardByName(trimmed);
+      if (!card) {
+        throw new Error(`Commander "${trimmed}" not found`);
+      }
+      applyScryfallToCommander(card);
+      cards = cards.filter((c) => c.name.toLowerCase() !== card.name.toLowerCase());
+      deck.commanderId = card.id;
+      deck.commanderName = card.name;
+      isChangingCommander = false;
+      commanderQuery = '';
+      commanderSuggestions = [];
+      saveStatus = `Commander changed to ${card.name}`;
+      void persistDeck();
+    } catch (err) {
+      commanderSearchError = err instanceof Error ? err.message : `Failed to load "${trimmed}"`;
+    } finally {
+      isSearchingCommander = false;
+    }
+  }
+
+  function handleCommanderKeydown(event: KeyboardEvent): void {
+    if (event.key === 'ArrowDown' && commanderSuggestions.length > 0) {
+      event.preventDefault();
+      activeCommanderSuggestionIndex = (activeCommanderSuggestionIndex + 1) % commanderSuggestions.length;
+    } else if (event.key === 'ArrowUp' && commanderSuggestions.length > 0) {
+      event.preventDefault();
+      activeCommanderSuggestionIndex = (activeCommanderSuggestionIndex - 1 + commanderSuggestions.length) % commanderSuggestions.length;
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (activeCommanderSuggestionIndex >= 0 && commanderSuggestions[activeCommanderSuggestionIndex]) {
+        void selectCommander(commanderSuggestions[activeCommanderSuggestionIndex]);
+      } else if (commanderQuery.trim()) {
+        void selectCommander(commanderQuery.trim());
+      }
+    } else if (event.key === 'Escape') {
+      isChangingCommander = false;
+      commanderSuggestions = [];
+      activeCommanderSuggestionIndex = -1;
+    }
+  }
 
   function toSynergyInput(card: DeckCard, isCommander = false): CardSynergyInput {
     return { id: card.id, name: card.name, typeLine: card.typeLine, oracleText: card.oracleText, manaCost: card.manaCost, cmc: card.cmc, category: isCommander ? 'commander' : card.role };
@@ -127,7 +305,8 @@
       role,
       typeLine: card.type_line,
       oracleText: card.oracle_text,
-      imageUris: card.image_uris
+      imageUris: card.image_uris,
+      colorIdentity: card.color_identity
     };
   }
 
@@ -148,20 +327,21 @@
       role: entry.category,
       typeLine: entry.typeLine ?? existing?.typeLine ?? 'Unknown',
       imageUris: entry.imageUris ?? existing?.imageUris,
+      colorIdentity: entry.colorIdentity ?? existing?.colorIdentity,
       synergyNotes: entry.synergyNotes ?? existing?.synergyNotes
     };
   }
 
   function deckFingerprint(): string {
-    return JSON.stringify({ name: deck.name, archetype: deck.archetype, cards: cards.map((card) => `${card.id}:${card.quantity}:${card.role}`) });
+    return JSON.stringify({ commanderId: commander.id, commanderName: commander.name, name: deck.name, archetype: deck.archetype, cards: cards.map((card) => `${card.id}:${card.quantity}:${card.role}`) });
   }
 
   async function persistDeck(fingerprint = deckFingerprint()): Promise<void> {
     isSaving = true;
     saveStatus = 'Saving changes...';
     const storedCards: SavedDeck['cards'] = [
-      { id: commander.id, name: commander.name, category: 'commander', quantity: 1, manaCost: commander.manaCost, cmc: commander.cmc, typeLine: commander.typeLine, imageUris: commander.imageUris },
-      ...cards.map((card) => ({ id: card.id, name: card.name, category: card.role, quantity: card.quantity, synergyNotes: card.synergyNotes, manaCost: card.manaCost, cmc: card.cmc, typeLine: card.typeLine, imageUris: card.imageUris }))
+      { id: commander.id, name: commander.name, category: 'commander', quantity: 1, manaCost: commander.manaCost, cmc: commander.cmc, typeLine: commander.typeLine, imageUris: commander.imageUris, colorIdentity: commander.colorIdentity },
+      ...cards.map((card) => ({ id: card.id, name: card.name, category: card.role, quantity: card.quantity, synergyNotes: card.synergyNotes, manaCost: card.manaCost, cmc: card.cmc, typeLine: card.typeLine, imageUris: card.imageUris, colorIdentity: card.colorIdentity }))
     ];
     const savedDeck: SavedDeck = { ...deck, commanderId: commander.id, commanderName: commander.name, cards: storedCards, updatedAt: new Date() };
     try {
@@ -266,7 +446,8 @@
     try {
       const scryfallCard = await getCardByName(cardName);
       if (scryfallCard) {
-        const newCard = toDeckCard(scryfallCard, (role as CardRole) || 'engine');
+        const newCard = toDeckCard(scryfallCard);
+        newCard.role = (role as CardRole) || 'engine';
         cards = [...cards, newCard];
         saveStatus = `Added ${cardName}`;
       } else {
@@ -277,6 +458,7 @@
           collectorNumber: '1',
           foil: false,
           quantity: 1,
+          manaCost: '',
           role: (role as CardRole) || 'engine',
           cmc: 3,
           typeLine: 'Spell'
@@ -360,6 +542,7 @@
             collectorNumber: '1',
             foil: false,
             quantity: qty,
+            manaCost: '',
             role: 'engine',
             cmc: 3,
             typeLine: 'Spell'
@@ -386,8 +569,15 @@
 
 <main class="page-wrap">
   <div class="workspace-heading enter">
-    <div><div class="breadcrumb"><span>DECKS</span><ChevronRight size={12} /><span class="current-crumb">{deck.name}</span><i></i><span class="saved-label">{saveStatus}</span></div><h1><input class="deck-name-input" bind:value={deck.name} aria-label="Deck name" /><small>v.04</small></h1><div class="heading-meta"><span class="commander-label"><i></i>Atraxa, Praetors’ Voice</span><b></b><span>{deck.archetype}</span><b></b><span>Updated just now</span></div></div>
+    <div><div class="breadcrumb"><span>DECKS</span><ChevronRight size={12} /><span class="current-crumb">{deck.name}</span><i></i><span class="saved-label">{saveStatus}</span></div><h1><input class="deck-name-input" bind:value={deck.name} aria-label="Deck name" /><small>v.04</small></h1><div class="heading-meta"><span class="commander-label"><i></i>{commander.name}</span><b></b><span>{deck.archetype}</span><b></b><span>Updated just now</span></div></div>
     <div class="heading-actions">
+      <button class="subtle-button key-button" onclick={() => showApiKeyModal = true} title="Configure Google Gemini API Key" aria-label="Configure Google Gemini API Key">
+        <Key size={13} />
+        <span>Gemini Key</span>
+        {#if hasApiKey}
+          <span class="key-status-dot active" title="API key configured"></span>
+        {/if}
+      </button>
       <button class="subtle-button" onclick={() => activeView = activeView === 'engines' ? 'studio' : 'engines'}><Activity size={13} /> Engine map</button>
       <button class="subtle-button" onclick={() => showIOModal = true}><FileText size={13} /> Decklist I/O</button>
       <button class="subtle-button" onclick={() => persistDeck()} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save deck'}</button>
@@ -395,7 +585,22 @@
     </div>
   </div>
 
-  <nav class="view-tabs" aria-label="Workspace views"><button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button><button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button><button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button><button class:active={activeView === 'matchup'} onclick={() => activeView = 'matchup'}><Target size={14} /> Matchup Arena</button><span></span><div class="identity"><i>W</i><i>U</i><i>B</i><i>G</i></div></nav>
+  <nav class="view-tabs" aria-label="Workspace views">
+    <button class:active={activeView === 'studio'} onclick={() => activeView = 'studio'}><Layers3 size={14} /> Studio <small>100</small></button>
+    <button class:active={activeView === 'engines'} onclick={() => activeView = 'engines'}><Activity size={14} /> Synergy map</button>
+    <button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button>
+    <button class:active={activeView === 'matchup'} onclick={() => activeView = 'matchup'}><Target size={14} /> Matchup Arena</button>
+    <span></span>
+    <div class="identity" aria-label="Commander Color Identity">
+      {#if commander.colorIdentity && commander.colorIdentity.length > 0}
+        {#each commander.colorIdentity as color}
+          <i class={`identity-pip identity-${color.toLowerCase()}`}>{color}</i>
+        {/each}
+      {:else}
+        <i class="identity-pip identity-c">C</i>
+      {/if}
+    </div>
+  </nav>
 
   {#if activeView === 'goldfish'}
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
@@ -407,7 +612,86 @@
     <div class="workspace" class:left-collapsed={!leftOpen} class:right-collapsed={!rightOpen}>
       {#if leftOpen}
         <aside class="left-rail enter">
-          <section class="panel commander-card"><div class="commander-art"><img src="https://api.scryfall.com/cards/named?exact=Atraxa%2C%20Praetors%E2%80%99%20Voice&format=image&version=art_crop" alt="Atraxa, Praetors’ Voice" /><span>COMMANDER</span></div><div class="commander-info"><strong>Atraxa, Praetors’ Voice</strong><small>Legendary Creature · Angel Horror</small><div class="commander-stats"><span>4 <small>colors</small></span><span>4 <small>power</small></span><span>4 <small>toughness</small></span></div><div class="commander-mana"><i class="pip-white">3</i><i class="pip-white">W</i><i class="pip-blue">U</i><i class="pip-black">B</i><i class="pip-green">G</i><span>SALT <b>{deck.saltScore}</b><i class="salt-meter"><b></b></i></span></div></div></section>
+          <section class="panel commander-card">
+            <div class="commander-art">
+              <img
+                src={commander.imageUris?.art_crop || commander.imageUris?.normal || `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(commander.name)}&format=image&version=art_crop`}
+                alt={commander.name}
+              />
+              <span>COMMANDER</span>
+              <button
+                class="change-commander-badge-btn"
+                onclick={() => { isChangingCommander = !isChangingCommander; commanderQuery = ''; commanderSuggestions = []; }}
+                title="Change Commander"
+                aria-label="Change Commander"
+              >
+                {#if isChangingCommander}
+                  <X size={11} /> Cancel
+                {:else}
+                  <Sparkles size={11} /> Switch
+                {/if}
+              </button>
+            </div>
+            {#if isChangingCommander}
+              <div class="commander-search-container">
+                <div class="commander-search-input-wrap">
+                  <Search size={12} />
+                  <input
+                    bind:value={commanderQuery}
+                    placeholder="Search legendary creature..."
+                    aria-label="Search new commander"
+                    onkeydown={handleCommanderKeydown}
+                  />
+                  {#if isSearchingCommander}
+                    <span class="search-spinner"></span>
+                  {/if}
+                </div>
+                {#if commanderSuggestions.length > 0}
+                  <div class="commander-suggestions-list" role="listbox" aria-label="Commander suggestions">
+                    {#each commanderSuggestions as suggestion, idx}
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={activeCommanderSuggestionIndex === idx}
+                        class:active-suggestion={activeCommanderSuggestionIndex === idx}
+                        onmouseenter={() => activeCommanderSuggestionIndex = idx}
+                        onmousedown={(e) => e.preventDefault()}
+                        onclick={() => selectCommander(suggestion)}
+                      >
+                        <Sparkles size={10} />
+                        <span>{suggestion}</span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+                {#if commanderSearchError}
+                  <p class="commander-search-error">{commanderSearchError}</p>
+                {/if}
+              </div>
+            {/if}
+            <div class="commander-info">
+              <div class="commander-title-row">
+                <strong>{commander.name}</strong>
+              </div>
+              <small>{commander.typeLine}</small>
+              <div class="commander-stats">
+                <span>{(commander.colorIdentity?.length ?? 0)} <small>colors</small></span>
+                <span>{commander.cmc} <small>cmc</small></span>
+                <button
+                  class="change-commander-link"
+                  onclick={() => { isChangingCommander = !isChangingCommander; commanderQuery = ''; commanderSuggestions = []; }}
+                >
+                  {isChangingCommander ? 'Close' : 'Change Commander'}
+                </button>
+              </div>
+              <div class="commander-mana">
+                {#each manaSymbols(commander.manaCost) as symbol}
+                  <i class={pipClass(symbol)}>{symbol}</i>
+                {/each}
+                <span>SALT <b>{deck.saltScore}</b><i class="salt-meter"><b></b></i></span>
+              </div>
+            </div>
+          </section>
           <section class="panel"><div class="panel-heading"><span class="panel-title">Mana curve</span><button class="mini-select">CMC <ChevronDown size={11} /></button></div><div class="curve-content"><div class="curve-total"><strong>3.14</strong><small>Average mana value</small></div><div class="curve-chart">{#each curve as bar}<div><small>{bar.count}</small><i style={`--height:${bar.height}%`}></i><small>{bar.label}</small></div>{/each}</div></div></section>
           <section class="panel"><div class="panel-heading"><span class="panel-title">Role balance</span><button class="icon-button" aria-label="Role settings"><ChevronDown size={14} /></button></div><div class="role-list">{#each roles as role}<button class="role-item" onclick={() => activeRole = activeRole === role ? 'all' : role}><i class={`role-mark role-${role}`}></i><span>{role}</span><b>{roleCount(role)}</b><i class="role-track"><i class={`bar-${role}`} style={`width:${Math.min(roleCount(role) * 10, 100)}%`}></i></i></button>{/each}</div><div class="role-foot"><span>Cards assigned</span><b>91 / 100</b></div></section>
         </aside>
@@ -476,10 +760,21 @@
   </div>
 {/if}
 
+<ApiKeyModal
+  open={showApiKeyModal}
+  onclose={() => {
+    showApiKeyModal = false;
+    hasApiKey = !!getGeminiApiKey();
+  }}
+  onkeychange={(k) => (hasApiKey = k)}
+/>
+
 <style>
+  .key-button { display: inline-flex; align-items: center; gap: 6px; }
+  .key-status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.75); }
   .workspace-heading{display:flex;align-items:end;justify-content:space-between;gap:18px;padding:2px 0 16px}.breadcrumb{display:flex;align-items:center;gap:7px;color:#666671;font:8px var(--mono);letter-spacing:.06em}.current-crumb{color:#a1a1aa}.breadcrumb i{width:5px;height:5px;margin-left:5px;border-radius:50%;background:#22c55e}.saved-label{color:#777780;font:9px 'Space Grotesk',sans-serif;letter-spacing:0}h1{display:flex;align-items:center;gap:9px;margin:7px 0 5px;color:#fafafa;font-size:24px;font-weight:600;line-height:1.1}.deck-name-input{width:min(320px,55vw);min-width:150px;padding:0;border:0;border-bottom:1px solid transparent;outline:0;background:transparent;color:inherit;font:inherit}.deck-name-input:hover,.deck-name-input:focus{border-bottom-color:#3f3f46}h1 small{padding:4px 5px;border:1px solid #303036;border-radius:3px;color:#8d8d97;font:8px var(--mono)}.heading-meta{display:flex;align-items:center;gap:9px;color:#777780;font-size:9px}.commander-label{display:inline-flex;align-items:center;gap:6px;color:#c4c4cb}.commander-label i{width:6px;height:6px;border-radius:50%;background:#38bdf8;box-shadow:5px 0 #a855f7,10px 0 #22c55e;margin-right:9px}.heading-meta>b{width:1px;height:10px;background:#3f3f46}.heading-actions{display:flex;gap:7px}.primary-button{display:inline-flex;min-height:30px;align-items:center;gap:6px;padding:0 10px;border:1px solid #38bdf85f;border-radius:5px;background:#0e749033;color:#bae6fd;font-size:10px;cursor:pointer}
-  .view-tabs{display:flex;height:40px;align-items:stretch;gap:18px;border-bottom:1px solid #303036}.view-tabs button{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 2px;border:0;background:transparent;color:#777780;font-size:10px;cursor:pointer}.view-tabs button.active{color:#e4e4e7}.view-tabs button.active:after{position:absolute;right:0;bottom:-1px;left:0;height:2px;background:#38bdf8;content:''}.view-tabs button small{padding:2px 5px;border-radius:3px;background:#26262b;color:#a1a1aa;font:8px var(--mono)}.view-tabs>span{flex:1}.identity{display:flex;align-items:center;gap:4px}.identity i{display:grid;width:16px;height:16px;place-items:center;border:1px solid #ffffff26;border-radius:50%;font:8px var(--mono);font-style:normal}.identity i:nth-child(1){background:#deded9;color:#27272a}.identity i:nth-child(2){background:#075985;color:#e0f2fe}.identity i:nth-child(3){background:#27202d;color:#e9d5ff}.identity i:nth-child(4){background:#14532d;color:#dcfce7}
-  .workspace{display:grid;grid-template-columns:minmax(205px,.82fr) minmax(390px,1.55fr) minmax(230px,.9fr);align-items:start;gap:11px;padding-top:13px}.workspace.left-collapsed{grid-template-columns:26px minmax(390px,1.6fr) minmax(230px,.9fr)}.workspace.right-collapsed{grid-template-columns:minmax(205px,.82fr) minmax(390px,1.6fr) 26px}.workspace.left-collapsed.right-collapsed{grid-template-columns:26px minmax(390px,1fr) 26px}.left-rail,.right-rail{display:grid;min-width:0;gap:9px}.commander-card{overflow:hidden}.commander-art{position:relative;height:115px;overflow:hidden;background:linear-gradient(120deg,#173744,#292234 54%,#36321d)}.commander-art img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;opacity:.75}.commander-art>span{position:absolute;top:9px;left:9px;padding:4px 6px;border:1px solid #ffffff40;border-radius:3px;background:#09090b99;color:#e4e4e7;font:7px var(--mono);letter-spacing:.08em}.commander-info{padding:10px 11px}.commander-info>strong{display:block;color:#e4e4e7;font-size:11px}.commander-info>small{display:block;margin-top:3px;color:#777780;font-size:8px}.commander-stats{display:flex;gap:12px;margin:10px 0;padding-bottom:9px;border-bottom:1px solid #29292e;color:#d4d4d8;font:9px var(--mono)}.commander-stats small{color:#777780;font:8px 'Space Grotesk',sans-serif}.commander-mana{display:flex;align-items:center;gap:4px}.commander-mana>i{display:grid;width:17px;height:17px;place-items:center;border:1px solid #777;border-radius:50%;background:#deded9;color:#18181b;font:8px var(--mono);font-style:normal}.commander-mana .pip-blue{border-color:#38bdf8;background:#0369a1;color:#e0f2fe}.commander-mana .pip-black{border-color:#a855f7;background:#27202d;color:#e9d5ff}.commander-mana .pip-green{border-color:#22c55e;background:#14532d;color:#dcfce7}.commander-mana>span{display:flex;align-items:center;gap:5px;margin-left:auto;color:#777780;font:7px var(--mono)}.commander-mana>span>b{color:#d4d4d8;font-size:9px;font-weight:500}.salt-meter{width:31px;height:3px;overflow:hidden;border-radius:2px;background:#35353a}.salt-meter>b{display:block;width:34%;height:100%;background:#f59e0b}
+  .view-tabs{display:flex;height:40px;align-items:stretch;gap:18px;border-bottom:1px solid #303036}.view-tabs button{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 2px;border:0;background:transparent;color:#777780;font-size:10px;cursor:pointer}.view-tabs button.active{color:#e4e4e7}.view-tabs button.active:after{position:absolute;right:0;bottom:-1px;left:0;height:2px;background:#38bdf8;content:''}.view-tabs button small{padding:2px 5px;border-radius:3px;background:#26262b;color:#a1a1aa;font:8px var(--mono)}.view-tabs>span{flex:1}.identity{display:flex;align-items:center;gap:4px}.identity i{display:grid;width:16px;height:16px;place-items:center;border:1px solid #ffffff26;border-radius:50%;font:8px var(--mono);font-style:normal}.identity i.identity-w{background:#deded9;color:#27272a;border-color:#ffffff40}.identity i.identity-u{background:#075985;color:#e0f2fe;border-color:#38bdf866}.identity i.identity-b{background:#27202d;color:#e9d5ff;border-color:#a855f766}.identity i.identity-r{background:#7f1d1d;color:#fee2e2;border-color:#ef444466}.identity i.identity-g{background:#14532d;color:#dcfce7;border-color:#22c55e66}.identity i.identity-c{background:#3f3f46;color:#e4e4e7;border-color:#71717a66}
+  .workspace{display:grid;grid-template-columns:minmax(205px,.82fr) minmax(390px,1.55fr) minmax(230px,.9fr);align-items:start;gap:11px;padding-top:13px}.workspace.left-collapsed{grid-template-columns:26px minmax(390px,1.6fr) minmax(230px,.9fr)}.workspace.right-collapsed{grid-template-columns:minmax(205px,.82fr) minmax(390px,1.6fr) 26px}.workspace.left-collapsed.right-collapsed{grid-template-columns:26px minmax(390px,1fr) 26px}.left-rail,.right-rail{display:grid;min-width:0;gap:9px}.commander-card{overflow:hidden}.commander-art{position:relative;height:115px;overflow:hidden;background:linear-gradient(120deg,#173744,#292234 54%,#36321d)}.commander-art img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;opacity:.75}.commander-art>span{position:absolute;top:9px;left:9px;padding:4px 6px;border:1px solid #ffffff40;border-radius:3px;background:#09090b99;color:#e4e4e7;font:7px var(--mono);letter-spacing:.08em}.commander-info{padding:10px 11px}.commander-info strong{display:block;color:#e4e4e7;font-size:11px}.commander-info>small{display:block;margin-top:3px;color:#777780;font-size:8px}.commander-stats{display:flex;gap:12px;margin:10px 0;padding-bottom:9px;border-bottom:1px solid #29292e;color:#d4d4d8;font:9px var(--mono)}.commander-stats small{color:#777780;font:8px 'Space Grotesk',sans-serif}.commander-mana{display:flex;align-items:center;gap:4px}.commander-mana>i{display:grid;width:17px;height:17px;place-items:center;border:1px solid #777;border-radius:50%;background:#deded9;color:#18181b;font:8px var(--mono);font-style:normal}.commander-mana .pip-white{border-color:#e2e8f0;background:#deded9;color:#18181b}.commander-mana .pip-blue{border-color:#38bdf8;background:#0369a1;color:#e0f2fe}.commander-mana .pip-black{border-color:#a855f7;background:#27202d;color:#e9d5ff}.commander-mana .pip-red{border-color:#f87171;background:#991b1b;color:#fee2e2}.commander-mana .pip-green{border-color:#22c55e;background:#14532d;color:#dcfce7}.commander-mana .pip-colorless{border-color:#94a3b8;background:#475569;color:#f1f5f9}.commander-mana .pip-generic{border-color:#52525b;background:#27272a;color:#d4d4d8}.commander-mana>span{display:flex;align-items:center;gap:5px;margin-left:auto;color:#777780;font:7px var(--mono)}.commander-mana>span>b{color:#d4d4d8;font-size:9px;font-weight:500}.salt-meter{width:31px;height:3px;overflow:hidden;border-radius:2px;background:#35353a}.salt-meter>b{display:block;width:34%;height:100%;background:#f59e0b}
   .mini-select{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid #303036;border-radius:3px;background:#18181b;color:#777780;font:8px var(--mono)}.curve-content{padding:10px 11px 8px}.curve-total{display:flex;align-items:baseline;gap:8px}.curve-total strong{color:#e4e4e7;font:500 16px var(--mono)}.curve-total small{color:#777780;font-size:8px}.curve-chart{display:grid;height:79px;grid-template-columns:repeat(7,1fr);align-items:end;gap:7px;margin-top:8px}.curve-chart>div{display:grid;height:100%;grid-template-rows:9px 1fr 11px;justify-items:center;align-items:end;gap:3px}.curve-chart small{color:#666671;font:7px var(--mono)}.curve-chart i{width:100%;height:var(--height);align-self:end;border:1px solid #38bdf82b;border-radius:3px 3px 0 0;background:linear-gradient(0deg,#0e749040,#38bdf88f)}.curve-chart>div:nth-child(4) i{background:linear-gradient(0deg,#22c55e22,#22c55e80)}
   .role-list{padding:5px 10px 1px}.role-item{display:grid;width:100%;grid-template-columns:14px 1fr 18px;align-items:center;gap:7px;padding:6px 0;border:0;background:transparent;color:#a1a1aa;font-size:9px;text-align:left;text-transform:capitalize;cursor:pointer}.role-item>b{color:#d4d4d8;font:9px var(--mono);text-align:right}.role-mark{width:12px;height:12px;border:1px solid currentColor;border-radius:4px}.role-ramp{color:#4ade80}.role-draw{color:#7dd3fc}.role-engine{color:#c084fc}.role-interaction{color:#f87171}.role-payoff{color:#fbbf24}.role-track{grid-column:2/4;height:2px;margin-top:-3px;border-radius:2px;background:#29292e}.role-track i{display:block;height:100%;background:currentColor}.bar-ramp{color:#22c55e}.bar-draw{color:#38bdf8}.bar-engine{color:#a855f7}.bar-interaction{color:#ef4444}.bar-payoff{color:#f59e0b}.role-foot,.market-foot{display:flex;justify-content:space-between;margin:2px 10px 9px;padding-top:8px;border-top:1px solid #29292e;color:#777780;font-size:8px}.role-foot b,.market-foot b{color:#a1a1aa;font:8px var(--mono)}
   .center-rail{min-width:0}.deck-panel{overflow:hidden}.panel-heading>div:first-child{display:flex;align-items:center;gap:8px}.library-total{color:#777780;font:8px var(--mono)}.tools{display:flex;gap:1px}.filter-toolbar{display:grid;grid-template-columns:minmax(100px,1fr) auto;gap:8px;padding:9px 11px;border-bottom:1px solid #25252a}.card-search{display:flex;min-width:0;height:28px;align-items:center;gap:6px;padding:0 7px;border:1px solid #303036;border-radius:4px;background:#101013;color:#71717a}.card-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#d4d4d8;font-size:9px}.card-search input::placeholder{color:#666671}.role-filters{display:flex;grid-column:1/-1;gap:4px;overflow:auto;scrollbar-width:none}.role-filters button{min-height:23px;flex:0 0 auto;padding:0 7px;border:1px solid #303036;border-radius:4px;background:#17171a;color:#777780;font-size:8px;text-transform:capitalize;cursor:pointer}.role-filters button.filter-active{border-color:#38bdf855;background:#0e749024;color:#7dd3fc}.role-filters small{color:#666671;font:8px var(--mono)}.filter-controls{display:flex;grid-column:1/-1;align-items:center;justify-content:end;gap:4px}.filter-controls label{display:flex;height:24px;align-items:center;gap:5px;padding:0 6px;border:1px solid #303036;border-radius:4px;color:#71717a}.filter-controls select{width:75px;border:0;outline:0;background:#17171a;color:#a1a1aa;font-size:8px}.filter-controls button{display:grid;width:25px;height:25px;place-items:center;border:1px solid transparent;border-radius:4px;background:transparent;color:#777780;cursor:pointer}.filter-controls button.chosen{border-color:#3a3a41;background:#222226;color:#e4e4e7}.card-summary{display:flex;justify-content:space-between;padding:8px 11px 0;color:#71717a;font:8px var(--mono)}.card-summary span{display:flex;align-items:center;gap:5px}.card-summary span:first-child i{width:5px;height:5px;border-radius:50%;background:#38bdf8}.card-summary span:last-child{color:#a3e635}.load-more{display:flex;width:calc(100% - 22px);min-height:28px;align-items:center;justify-content:center;gap:6px;margin:0 11px 9px;border:1px solid #2d2d33;border-radius:4px;background:#17171a;color:#85858f;font-size:8px}
@@ -512,4 +807,17 @@
   .io-options { display: flex; align-items: center; gap: 8px; }
   .io-check { display: inline-flex; align-items: center; gap: 7px; color: #a1a1aa; font-size: 9px; cursor: pointer; }
   .io-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .change-commander-badge-btn { position: absolute; top: 9px; right: 9px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border: 1px solid #38bdf855; border-radius: 3px; background: #09090bcc; color: #7dd3fc; font: 8px var(--mono); letter-spacing: .04em; cursor: pointer; transition: all .15s ease; }
+  .change-commander-badge-btn:hover { background: #0e7490; color: #f0f9ff; border-color: #38bdf8; }
+  .change-commander-link { margin-left: auto; padding: 0; border: 0; background: transparent; color: #7dd3fc; font: 8px var(--mono); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .change-commander-link:hover { color: #bae6fd; }
+  .commander-search-container { position: relative; padding: 8px 10px; background: #141418; border-bottom: 1px solid #27272a; }
+  .commander-search-input-wrap { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid #38bdf866; border-radius: 4px; background: #0c0c0e; color: #a1a1aa; }
+  .commander-search-input-wrap input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #f4f4f5; font-size: 9px; font-family: inherit; }
+  .commander-search-input-wrap input::placeholder { color: #71717a; }
+  .commander-suggestions-list { position: absolute; top: calc(100% + 2px); left: 10px; right: 10px; z-index: 25; display: grid; max-height: 190px; overflow-y: auto; padding: 4px; border: 1px solid #3f3f46; border-radius: 5px; background: #16161a; box-shadow: 0 10px 24px rgba(0,0,0,.7); }
+  .commander-suggestions-list button { display: flex; min-height: 26px; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 3px; background: transparent; color: #d4d4d8; font-size: 9px; text-align: left; cursor: pointer; }
+  .commander-suggestions-list button:hover, .commander-suggestions-list button.active-suggestion { background: #0e749040; color: #7dd3fc; }
+  .commander-search-error { margin: 5px 0 0; color: #f87171; font-size: 8px; }
+  .commander-title-row { display: flex; align-items: center; justify-content: space-between; }
 </style>

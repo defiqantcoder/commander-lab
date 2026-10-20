@@ -52,7 +52,7 @@ Commander Lab is a zero-cost, local-first Progressive Web App (PWA) engineered s
    - Compiles 2 to 3 complete 100-card decklists with card art, role tags (ramp, draw, engine, interaction, payoff), and mana curve balancing.
 5. **Market Timing & Liquidation Advisor:**
    - Scans personal collection cards against live market trends and reprint risk windows to pinpoint optimal exit/liquidation opportunities.
-6. **Turn 1–5 Goldfish Simulator ("Argon Turn Advisor"):**
+6. **Turn 1–5 Goldfish Simulator ("Gemini Turn Advisor"):**
    - In-browser testing bench simulating opening hands, mulligan decisions, curve-out lines, and turn 1–5 sequencing suggestions.
 7. **Contextual Budget & Collection Swapper:**
    - Recommends hidden gems ($0.50 range) that replicate 90% of a staple's functional output.
@@ -125,7 +125,7 @@ export const db = new CommanderLabDB();
 - Implement a 100ms rate-limiting throttle between outbound requests.
 - Add automatic IndexedDB cache lookups before dispatching HTTP calls to Scryfall.
 
-### Step 4: Argon Structured Prompt Pipeline (`src/lib/ai/argon.ts`)
+### Step 4: Google Gemini Structured Prompt Pipeline (`src/lib/ai/gemini.ts`)
 - Wrap the Gemini API using structured JSON schema output mode (`responseSchema`).
 - Return typed archetypes, card categorization arrays, and Svelte Flow node/edge definitions.
 

@@ -37,6 +37,7 @@ export interface DeckCardEntry {
   cmc?: number;
   typeLine?: string;
   imageUris?: CardImageUris;
+  colorIdentity?: string[];
 }
 
 export interface SavedDeck {
