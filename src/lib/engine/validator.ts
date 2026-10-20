@@ -110,14 +110,7 @@ const UNRESTRICTED_CARD_NAMES = new Set<string>([
   'Seven Dwarves' // Allows up to 7
 ]);
 
-export function validateDeck(cards: CardCheckItem[]): ValidationResult {
-  const errors: ValidationError[] = [];
-  const warnings: ValidationWarning[] = [];
-
-  const commanders = cards.filter((c) => c.isCommander);
-  const totalCount = cards.reduce((sum, c) => sum + (c.quantity || 1), 0);
-
-  // 1. Verify Commander Presence
+function validateCommanderPresence(commanders: CardCheckItem[], errors: ValidationError[]) {
   if (commanders.length === 0) {
     errors.push({
       type: 'invalid_commander',
@@ -129,11 +122,11 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
       message: 'Commander decks cannot have more than 2 commanders (e.g. Partner / Friends Forever / Background pairs).'
     });
   }
+}
 
-  // 2. Aggregate Commander Color Identity
+function getCommanderColors(commanders: CardCheckItem[], errors: ValidationError[]): string[] {
   const commanderColorSet = new Set<string>();
   for (const cmd of commanders) {
-    // Check if eligible commander
     const isLegendaryCreature = /legendary.*creature/i.test(cmd.typeLine);
     const isPlaneswalkerCommander =
       /planeswalker/i.test(cmd.typeLine) && /can be your commander/i.test(cmd.oracleText || '');
@@ -150,20 +143,26 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
 
     cmd.colorIdentity.forEach((c) => commanderColorSet.add(c.toUpperCase()));
   }
+  return Array.from(commanderColorSet);
+}
 
-  const commanderColors = Array.from(commanderColorSet);
-
-  // 3. Deck Size (Commander format is strictly 100 cards)
+function validateDeckSize(totalCount: number, errors: ValidationError[]) {
   if (totalCount !== 100) {
     errors.push({
       type: 'deck_size',
       message: `Total deck count is ${totalCount} cards. Commander decks must have exactly 100 cards.`
     });
   }
+}
 
-  // 4. Per-Card Validations: Singleton, Color Identity, and Banlist
+function validateCards(
+  cards: CardCheckItem[],
+  commanderColors: string[],
+  errors: ValidationError[]
+): number {
   let landCount = 0;
   const nameCounts = new Map<string, number>();
+  const commanderColorSet = new Set(commanderColors);
 
   for (const card of cards) {
     const qty = card.quantity || 1;
@@ -173,7 +172,6 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
       landCount += qty;
     }
 
-    // Banlist check
     if (COMMANDER_BANLIST.has(name)) {
       errors.push({
         type: 'banned',
@@ -182,7 +180,6 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
       });
     }
 
-    // Singleton check
     const currentCount = (nameCounts.get(name) || 0) + qty;
     nameCounts.set(name, currentCount);
 
@@ -198,7 +195,6 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
       }
     }
 
-    // Color Identity Check (excluding commander itself)
     if (!card.isCommander && card.colorIdentity.length > 0) {
       const invalidColors = card.colorIdentity.filter(
         (c) => !commanderColorSet.has(c.toUpperCase())
@@ -213,13 +209,30 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
     }
   }
 
-  // Warnings for deck health
+  return landCount;
+}
+
+function validateDeckHealth(landCount: number, warnings: ValidationWarning[]) {
   if (landCount > 0 && landCount < 30) {
     warnings.push({
       type: 'low_land_count',
       message: `Low land count detected (${landCount} lands). Recommended baseline is 34-38 lands.`
     });
   }
+}
+
+export function validateDeck(cards: CardCheckItem[]): ValidationResult {
+  const errors: ValidationError[] = [];
+  const warnings: ValidationWarning[] = [];
+
+  const commanders = cards.filter((c) => c.isCommander);
+  const totalCount = cards.reduce((sum, c) => sum + (c.quantity || 1), 0);
+
+  validateCommanderPresence(commanders, errors);
+  const commanderColors = getCommanderColors(commanders, errors);
+  validateDeckSize(totalCount, errors);
+  const landCount = validateCards(cards, commanderColors, errors);
+  validateDeckHealth(landCount, warnings);
 
   return {
     valid: errors.length === 0,
