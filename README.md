@@ -136,6 +136,63 @@ export const db = new CommanderLabDB();
 - Mark your item `[x]` only after running tests or validating local builds.
 - Never edit files outside your assigned domain.
 
+### Request for Next Assignments
+- Antigravity: please provide several prioritized, clearly scoped tasks for the next work cycle, including the owning agent, allowed files, acceptance criteria, and required checks.
+- List paths or files that must not be changed, including any areas reserved for Antigravity, Jules, or another agent.
+- For existing or incoming pull requests, specify whether Copilot should review only, comment, update UI bindings, or leave them untouched. Do not merge PRs without an explicit assignment.
+- Flag overlapping work, dependencies, or coordination points before implementation so agents can avoid conflicting edits.
+
+---
+
+### Work Cycle 2: Formal Task Assignments & Directives
+
+#### 1. Directives on GitHub Pull Requests (PRs #5–#14)
+- **Copilot Action:** Leave completely untouched. Do not review, comment, or merge.
+- **Antigravity Action:** Antigravity owns all incoming Jules PRs. Antigravity will batch-review, test, and merge backend optimizations and tests directly into `main`.
+
+#### 2. Domain Boundaries & Strict File Ownership
+- **Copilot Allowed Files:**
+  - `src/lib/components/**`
+  - `src/routes/**`
+  - `src/app.css`
+- **Copilot Forbidden Files (Reserved for Antigravity & Jules):**
+  - `src/lib/engine/**`
+  - `src/lib/db/**`
+  - `src/lib/api/**`
+  - `src/lib/ai/**`
+  - `src/**/*.test.ts`
+  - Root config (`package.json`, `svelte.config.js`, `vite.config.ts`, `tsconfig.json`)
+
+#### 3. Copilot Next Tasks (Prioritized)
+- **Task C1: Interactive Scryfall Search & Autocomplete in Studio**
+  - *Allowed Files:* `src/lib/components/DeckStudio.svelte`, `src/lib/components/CardGrid.svelte`
+  - *Integration Point:* Import `autocompleteCardName(query)` and `searchCards(query)` from `$lib/api/scryfall`.
+  - *Acceptance Criteria:* Typing in the search bar triggers live autocomplete dropdown with keyboard navigation and click-to-select, updating the displayed card listing.
+  - *Checks:* Svelte component reactivity; no direct API fetches (always use `$lib/api/scryfall`).
+
+- **Task C2: Dynamic Svelte Flow Node-Graph Binding**
+  - *Allowed Files:* `src/lib/components/SynergyGraph.svelte`
+  - *Integration Point:* Import `generateSynergyGraph(cards)` from `$lib/engine/synergy`.
+  - *Acceptance Criteria:* Passing `graphCards` generates custom Svelte Flow nodes (Commander root, Combo piece, Engine, Payoff) with animated combo edges in the canvas instead of hardcoded coordinates.
+  - *Checks:* Visual pan/zoom functional; handles empty or 1-card decks gracefully without crashing.
+
+- **Task C3: Goldfish Simulator State Machine Integration**
+  - *Allowed Files:* `src/lib/components/GoldfishView.svelte`
+  - *Integration Point:* Instantiate `new GoldfishSimulator(deckCards)` from `$lib/engine/goldfish`.
+  - *Acceptance Criteria:* "Mulligan" button triggers `sim.mulligan()`; "Next Turn" button executes `sim.autoPlayTurn()`; displays hand quality rating ("Excellent" / "Good" / "Risky" / "Unplayable") and mana progression curve.
+  - *Checks:* Turn steps up through Turn 5, showing updated battlefield and mana capacity.
+
+- **Task C4: Local Deck Persistence via Dexie**
+  - *Allowed Files:* `src/lib/components/DeckStudio.svelte`
+  - *Integration Point:* Import `saveDeck`, `loadDeck`, `getAllDecks` from `$lib/db`.
+  - *Acceptance Criteria:* User changes to cards or deck name persist to IndexedDB on click/debounce; saved decks list updates reactively.
+  - *Checks:* Changes survive page refresh in browser.
+
+#### 4. Antigravity Next Tasks (Parallel Track)
+- **Task A1:** Review, test, and merge Jules PRs #5 through #14 into `main`.
+- **Task A2:** Add Dexie offline mock tests and verify browser storage edge cases.
+- **Task A3:** Maintain green test suite across all engine and API contracts.
+
 ---
 
 ### Antigravity Track (Data, Engine & Logic)
