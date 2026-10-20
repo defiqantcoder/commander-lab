@@ -104,10 +104,12 @@ const queue = new RequestQueue();
 const SCRYFALL_BASE = 'https://api.scryfall.com';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+const HAS_DB = typeof indexedDB !== 'undefined' && !!db?.marketCache;
+
 export async function fetchWithCache<T>(cacheKey: string, url: string): Promise<T> {
   // 1. Check IndexedDB cache if available in browser
   try {
-    if (typeof indexedDB !== 'undefined' && db?.marketCache) {
+    if (HAS_DB) {
       const cached = await db.marketCache.get(cacheKey);
       if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
         return cached.data as T;
@@ -138,7 +140,7 @@ export async function fetchWithCache<T>(cacheKey: string, url: string): Promise<
 
   // 3. Save to cache asynchronously
   try {
-    if (typeof indexedDB !== 'undefined' && db?.marketCache) {
+    if (HAS_DB) {
       await db.marketCache.put({
         id: cacheKey,
         name: cacheKey,
