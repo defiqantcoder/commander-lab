@@ -248,6 +248,7 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
   const nodes: SynergyNode[] = [];
   const edges: SynergyEdge[] = [];
   const cardMap = new Map<string, CardSynergyInput>();
+  const addedNodeIds = new Set<string>();
 
   cards.forEach(c => cardMap.set(c.name, c));
 
@@ -257,8 +258,10 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
 
   // Add commander nodes at root
   commanders.forEach((cmd, idx) => {
+    const cmdId = `cmd-${cmd.id || idx}`;
+    addedNodeIds.add(cmdId);
     nodes.push({
-      id: `cmd-${cmd.id || idx}`,
+      id: cmdId,
       type: 'commanderNode',
       data: {
         label: cmd.name,
@@ -283,7 +286,8 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
       const nodeAId = `node-${cardA.id || combo.pair[0]}`;
       const nodeBId = `node-${cardB.id || combo.pair[1]}`;
 
-      if (!nodes.some(n => n.id === nodeAId)) {
+      if (!addedNodeIds.has(nodeAId)) {
+        addedNodeIds.add(nodeAId);
         nodes.push({
           id: nodeAId,
           type: 'comboNode',
@@ -298,7 +302,8 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
         });
       }
 
-      if (!nodes.some(n => n.id === nodeBId)) {
+      if (!addedNodeIds.has(nodeBId)) {
+        addedNodeIds.add(nodeBId);
         nodes.push({
           id: nodeBId,
           type: 'comboNode',
