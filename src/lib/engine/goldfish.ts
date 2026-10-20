@@ -202,8 +202,8 @@ export class GoldfishSimulator {
 
   public playLand(cardId: string): boolean {
     if (this.landPlayedThisTurn) return false;
-    const idx = this.hand.findIndex(c => c.id === cardId && /land/i.test(c.typeLine));
-    if (idx === -1) return false;
+    const idx = this.hand.findIndex(c => c.id === cardId);
+    if (idx === -1 || !this.hand[idx].typeLine.toLowerCase().includes('land')) return false;
 
     const [land] = this.hand.splice(idx, 1);
     this.battlefield.push(land);
@@ -246,7 +246,7 @@ export class GoldfishSimulator {
 
     // 1. Play Land if possible
     if (!this.landPlayedThisTurn) {
-      const landIdx = this.hand.findIndex(c => /land/i.test(c.typeLine));
+      const landIdx = this.hand.findIndex(c => c.typeLine.toLowerCase().includes('land'));
       if (landIdx !== -1) {
         const land = this.hand[landIdx];
         this.playLand(land.id);
