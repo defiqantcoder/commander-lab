@@ -114,60 +114,25 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  const commanders = cards.filter((c) => c.isCommander);
-  const totalCount = cards.reduce((sum, c) => sum + (c.quantity || 1), 0);
-
-  // 1. Verify Commander Presence
-  if (commanders.length === 0) {
-    errors.push({
-      type: 'invalid_commander',
-      message: 'Deck must have at least one designated Commander.'
-    });
-  } else if (commanders.length > 2) {
-    errors.push({
-      type: 'invalid_commander',
-      message: 'Commander decks cannot have more than 2 commanders (e.g. Partner / Friends Forever / Background pairs).'
-    });
-  }
-
-  // 2. Aggregate Commander Color Identity
-  const commanderColorSet = new Set<string>();
-  for (const cmd of commanders) {
-    // Check if eligible commander
-    const isLegendaryCreature = /legendary.*creature/i.test(cmd.typeLine);
-    const isPlaneswalkerCommander =
-      /planeswalker/i.test(cmd.typeLine) && /can be your commander/i.test(cmd.oracleText || '');
-    const isBackgroundCommander =
-      /legendary.*background/i.test(cmd.typeLine);
-
-    if (!isLegendaryCreature && !isPlaneswalkerCommander && !isBackgroundCommander) {
-      errors.push({
-        type: 'invalid_commander',
-        message: `${cmd.name} is not an eligible commander (must be Legendary Creature, eligible Planeswalker, or Background).`,
-        cardName: cmd.name
-      });
-    }
-
-    cmd.colorIdentity.forEach((c) => commanderColorSet.add(c.toUpperCase()));
-  }
-
-  const commanderColors = Array.from(commanderColorSet);
-
-  // 3. Deck Size (Commander format is strictly 100 cards)
-  if (totalCount !== 100) {
-    errors.push({
-      type: 'deck_size',
-      message: `Total deck count is ${totalCount} cards. Commander decks must have exactly 100 cards.`
-    });
-  }
-
-  // 4. Per-Card Validations: Singleton, Color Identity, and Banlist
+  let totalCount = 0;
   let landCount = 0;
   const nameCounts = new Map<string, number>();
+  const commanders: CardCheckItem[] = [];
+  const nonCommanders: CardCheckItem[] = [];
 
-  for (const card of cards) {
+  // Pass 1: Categorize cards, count totals, and check singleton/banlist
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
     const qty = card.quantity || 1;
     const name = card.name.trim();
+
+    totalCount += qty;
+
+    if (card.isCommander) {
+      commanders.push(card);
+    } else {
+      nonCommanders.push(card);
+    }
 
     if (/land/i.test(card.typeLine)) {
       landCount += qty;
@@ -197,17 +162,67 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
         });
       }
     }
+  }
 
-    // Color Identity Check (excluding commander itself)
-    if (!card.isCommander && card.colorIdentity.length > 0) {
+  // 1. Verify Commander Presence
+  if (commanders.length === 0) {
+    errors.push({
+      type: 'invalid_commander',
+      message: 'Deck must have at least one designated Commander.'
+    });
+  } else if (commanders.length > 2) {
+    errors.push({
+      type: 'invalid_commander',
+      message: 'Commander decks cannot have more than 2 commanders (e.g. Partner / Friends Forever / Background pairs).'
+    });
+  }
+
+  // 2. Aggregate Commander Color Identity
+  const commanderColorSet = new Set<string>();
+  for (let i = 0; i < commanders.length; i++) {
+    const cmd = commanders[i];
+    // Check if eligible commander
+    const isLegendaryCreature = /legendary.*creature/i.test(cmd.typeLine);
+    const isPlaneswalkerCommander =
+      /planeswalker/i.test(cmd.typeLine) && /can be your commander/i.test(cmd.oracleText || '');
+    const isBackgroundCommander =
+      /legendary.*background/i.test(cmd.typeLine);
+
+    if (!isLegendaryCreature && !isPlaneswalkerCommander && !isBackgroundCommander) {
+      errors.push({
+        type: 'invalid_commander',
+        message: `${cmd.name} is not an eligible commander (must be Legendary Creature, eligible Planeswalker, or Background).`,
+        cardName: cmd.name
+      });
+    }
+
+    for (let j = 0; j < cmd.colorIdentity.length; j++) {
+      commanderColorSet.add(cmd.colorIdentity[j].toUpperCase());
+    }
+  }
+
+  const commanderColors = Array.from(commanderColorSet);
+
+  // 3. Deck Size (Commander format is strictly 100 cards)
+  if (totalCount !== 100) {
+    errors.push({
+      type: 'deck_size',
+      message: `Total deck count is ${totalCount} cards. Commander decks must have exactly 100 cards.`
+    });
+  }
+
+  // 4. Color Identity Check (excluding commander itself)
+  for (let i = 0; i < nonCommanders.length; i++) {
+    const card = nonCommanders[i];
+    if (card.colorIdentity.length > 0) {
       const invalidColors = card.colorIdentity.filter(
         (c) => !commanderColorSet.has(c.toUpperCase())
       );
       if (invalidColors.length > 0) {
         errors.push({
           type: 'color_identity',
-          message: `${name} has color identity [${invalidColors.join(', ')}] which is not in the commander's identity [${commanderColors.join(', ') || 'Colorless'}].`,
-          cardName: name
+          message: `${card.name.trim()} has color identity [${invalidColors.join(', ')}] which is not in the commander's identity [${commanderColors.join(', ') || 'Colorless'}].`,
+          cardName: card.name.trim()
         });
       }
     }
@@ -234,4 +249,3 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
     }
   };
 }
-
