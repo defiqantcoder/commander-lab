@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
+  import { Background, BackgroundVariant, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
   import { Focus, GitBranch } from 'lucide-svelte';
+  import { writable } from 'svelte/store';
   import { generateSynergyGraph } from '$lib/engine/synergy';
   import type { SynergyEdge, SynergyNode } from '$lib/engine/synergy';
   import type { DeckCard } from './types';
 
   export let cards: DeckCard[] = [];
+  const nodes = writable<SynergyNode[]>([]);
+  const edges = writable<SynergyEdge[]>([]);
+  let nodeCount = 0;
+  let edgeCount = 0;
 
   $: graph = generateSynergyGraph(cards.map((card) => ({
     id: card.id,
@@ -16,30 +21,25 @@
     cmc: card.cmc,
     category: card.role
   })));
-  $: nodes = toFlowNodes();
-  $: edges = graph.edges as SynergyEdge[];
-  $: nodeCount = nodes.length;
-  $: edgeCount = edges.length;
-
-  let nodes: SynergyNode[] = [];
-  let edges: SynergyEdge[] = [];
-  let nodeCount = 0;
-  let edgeCount = 0;
+  $: nodes.set(toFlowNodes());
+  $: edges.set(graph.edges as SynergyEdge[]);
+  $: nodeCount = graph.nodes.length;
+  $: edgeCount = graph.edges.length;
 
   function toFlowNodes(): SynergyNode[] {
     return graph.nodes.map((node) => ({ ...node, type: 'default' }));
   }
 
   function resetPositions(): void {
-    nodes = toFlowNodes().map((node) => ({ ...node, position: { ...node.position } }));
+    nodes.set(toFlowNodes().map((node) => ({ ...node, position: { ...node.position } })));
   }
 </script>
 
 <div class="graph-shell">
   <div class="graph-toolbar"><span><GitBranch size={13} /> ENGINE MAP</span><button onclick={resetPositions} aria-label="Reset graph layout" title="Reset graph layout"><Focus size={14} /></button></div>
   <div class="flow-stage">
-    <SvelteFlow bind:nodes bind:edges fitView>
-      <Background color="#34343a" gap={20} />
+    <SvelteFlow {nodes} {edges} fitView>
+      <Background variant={BackgroundVariant.Dots} gap={20} />
       <Controls />
       <MiniMap pannable zoomable />
     </SvelteFlow>

@@ -1,7 +1,73 @@
-import { describe, it, expect } from 'vitest';
-import { calculateReprintRisk, type ScryfallCard } from './scryfall';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { calculateReprintRisk, getCardById, type ScryfallCard } from './scryfall';
+
+vi.mock('$lib/db', () => ({
+  db: {
+    marketCache: {
+      get: vi.fn(),
+      put: vi.fn()
+    }
+  }
+}));
 
 describe('ScryfallAPI', () => {
+  let originalFetch: any;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('spaces out concurrent requests by at least 100ms', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'mock-id' })
+    });
+    global.fetch = fetchMock;
+
+    const start = Date.now();
+
+    const promises = [
+      getCardById('id-1'),
+      getCardById('id-2'),
+      getCardById('id-3')
+    ];
+
+    await Promise.all(promises);
+
+    const end = Date.now();
+    expect(end - start).toBeGreaterThanOrEqual(180);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('bypasses the rate-limiter when cached entries exist and are within TTL', async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock;
+
+    const mockData = { id: 'cached-id', name: 'Cached Card' };
+
+    const { db } = await import('$lib/db');
+    (db.marketCache.get as any).mockResolvedValue({
+      data: mockData,
+      cachedAt: Date.now()
+    });
+
+    global.indexedDB = {} as any;
+
+    const start = Date.now();
+    const result1 = await getCardById('id-cached-1');
+    const result2 = await getCardById('id-cached-2');
+    const end = Date.now();
+
+    expect(result1).toEqual(mockData);
+    expect(result2).toEqual(mockData);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(end - start).toBeLessThan(100);
+  });
   it('returns 0 reprint risk for Reserved List cards', () => {
     const card: ScryfallCard = {
       id: 'volcanic-island',

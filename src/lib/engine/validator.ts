@@ -130,6 +130,14 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
     });
   }
 
+  // 1.5. Partner / Multi-Commander Warnings
+  if (commanders.length === 2) {
+    warnings.push({
+      type: 'partner_pairing',
+      message: 'Deck has 2 commanders. Ensure they legally partner (e.g. Partner, Friends Forever, Choose a Background).'
+    });
+  }
+
   // 2. Aggregate Commander Color Identity
   const commanderColorSet = new Set<string>();
   for (const cmd of commanders) {

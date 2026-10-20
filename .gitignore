@@ -7,4 +7,14 @@ dist
 !.env.example
 *.log
 .DS_Store
+.idea
+.vscode
+.claude
+.mcp.json
+.bash*
+.z*
+.profile*
+.ripgreprc
+.gitconfig
+.gitmodules
 

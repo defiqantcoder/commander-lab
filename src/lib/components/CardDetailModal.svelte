@@ -8,7 +8,7 @@
 
 {#if card}
   <div class="scrim" role="presentation" onclick={(event) => event.target === event.currentTarget && onclose()}>
-    <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <dialog open class="detail-modal" aria-modal="true" aria-labelledby="detail-title">
       <button class="close icon-button" onclick={onclose} aria-label="Close card details"><X size={17} /></button>
       <div class="detail-art">
         <img src={`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(card.name)}&format=image&version=normal`} alt={`${card.name} card image`} />
@@ -29,13 +29,13 @@
         </section>
         <a class="scryfall-link" href={`https://scryfall.com/search?q=${encodeURIComponent(card.name)}`} target="_blank" rel="noreferrer">Open on Scryfall <ExternalLink size={13} /></a>
       </div>
-    </section>
+    </dialog>
   </div>
 {/if}
 
 <style>
   .scrim { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .78); backdrop-filter: blur(8px); }
-  .detail-modal { position: relative; display: grid; width: min(760px, 100%); max-height: min(620px, 92vh); grid-template-columns: minmax(230px, .8fr) 1fr; overflow: auto; border: 1px solid #3f3f46; border-radius: 9px; background: #131316; box-shadow: 0 24px 90px rgba(0,0,0,.5); animation: rise-in .2s ease both; }
+  .detail-modal { position: relative; display: grid; width: min(760px, 100%); max-height: min(620px, 92vh); grid-template-columns: minmax(230px, .8fr) 1fr; overflow: auto; margin: 0; padding: 0; border: 1px solid #3f3f46; border-radius: 9px; background: #131316; color: inherit; box-shadow: 0 24px 90px rgba(0,0,0,.5); animation: rise-in .2s ease both; }
   .close { position: absolute; z-index: 2; top: 10px; right: 10px; border-color: rgba(255,255,255,.13); background: rgba(9,9,11,.72); color: #e4e4e7; }
   .detail-art { position: relative; min-height: 360px; overflow: hidden; background: #202024; }
   .detail-art img { width: 100%; height: 100%; position: absolute; object-fit: cover; }

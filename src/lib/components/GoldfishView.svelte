@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { ChevronLeft, ChevronRight, Dices, MoreHorizontal, RotateCcw, ScrollText, Swords } from 'lucide-svelte';
   import { GoldfishSimulator, type SimCard, type SimTurnAction, type SimTurnSnapshot } from '$lib/engine/goldfish';
   import type { DeckCard } from './types';
 
-  let { cards, commander } = $props<{ cards: DeckCard[]; commander: DeckCard }>();
-  const simulatorCards: SimCard[] = [
+  let { cards, commander }: { cards: DeckCard[]; commander: DeckCard } = $props();
+  let simulatorCards: SimCard[] = $derived([
     ...cards.map((card) => ({
       id: card.id,
       name: card.name,
@@ -15,22 +16,22 @@
       category: card.role
     })),
     { id: commander.id, name: commander.name, typeLine: commander.typeLine, cmc: commander.cmc, manaCost: commander.manaCost, oracleText: commander.oracleText, category: 'commander', isCommander: true }
-  ];
+  ]);
 
-  let simulator = $state.raw(new GoldfishSimulator(simulatorCards));
+  let simulator = $state.raw(new GoldfishSimulator(untrack(() => simulatorCards)));
   let selectedTurn = $state(0);
   let activeTab = $state<'hand' | 'sequence'>('hand');
   let kept = $state(false);
-  let handCards = $state<SimCard[]>([...simulator.hand]);
+  let handCards = $state<SimCard[]>([]);
   let battlefieldCards = $state<SimCard[]>([]);
   let graveyardCards = $state<SimCard[]>([]);
-  let commandZoneCards = $state<SimCard[]>([...simulator.commandZone]);
+  let commandZoneCards = $state<SimCard[]>([]);
   let snapshots = $state<SimTurnSnapshot[]>([]);
   let turnActions = $state<SimTurnAction[]>([]);
   let manaAvailable = $state(0);
   let manaCapacity = $state(0);
-  let libraryCount = $state(simulator.library.length);
-  let handAdvice = $state(simulator.evaluateHand());
+  let libraryCount = $state(0);
+  let handAdvice = $state<ReturnType<GoldfishSimulator['evaluateHand']>>({ quality: 'Good', recommendation: 'Review this opening hand.' });
   let visibleHand = $derived(selectedTurn === simulator.turnNumber ? handCards.map((card) => card.name) : snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.hand ?? handCards.map((card) => card.name));
   let visibleBattlefield = $derived(selectedTurn === simulator.turnNumber ? battlefieldCards.map((card) => card.name) : snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.battlefield ?? []);
   let visibleActions = $derived(selectedTurn === simulator.turnNumber ? turnActions : snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.actions ?? []);
@@ -109,6 +110,15 @@
       ? { ...snapshot, hand: handCards.map((card) => card.name), battlefield: battlefieldCards.map((card) => card.name), graveyard: graveyardCards.map((card) => card.name), manaCapacity, manaAvailable, actions: turnActions }
       : snapshot);
   }
+
+  untrack(syncFromSimulator);
+  let previousDeckSnapshot = untrack(() => JSON.stringify(simulatorCards));
+  $effect(() => {
+    const nextDeckSnapshot = JSON.stringify(simulatorCards);
+    if (nextDeckSnapshot === previousDeckSnapshot) return;
+    previousDeckSnapshot = nextDeckSnapshot;
+    untrack(resetHand);
+  });
 </script>
 
 <section class="bench">
@@ -210,10 +220,9 @@
   .hand-card { min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
   .hand-card:disabled { cursor: default; }
   .hand-art { display: grid; aspect-ratio: 1.1 / .72; place-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.08); border-radius: 4px; background: linear-gradient(135deg, #1a3d44, #18211f 58%, #402a22); }
-  .hand-art span { color: rgba(255,255,255,.3); font-size: 21px; font-weight: 700; }
   .hand-art img { width: 100%; height: 100%; object-fit: cover; }
   .art-1 { background: linear-gradient(135deg, #5a4632, #253642 55%, #22201d); }.art-2 { background: linear-gradient(135deg, #4b315b, #262330 60%, #343f2e); }.art-3 { background: linear-gradient(135deg, #5b5b43, #252927 55%, #153847); }.art-4 { background: linear-gradient(135deg, #42563f, #26312b 55%, #4e372c); }
-  .hand-name { display: -webkit-box; min-height: 22px; overflow: hidden; margin-top: 4px; color: #a1a1aa; font-size: 8px; line-height: 1.25; text-overflow: ellipsis; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hand-name { display: -webkit-box; min-height: 22px; overflow: hidden; margin-top: 4px; color: #a1a1aa; font-size: 8px; line-height: 1.25; line-clamp: 2; text-overflow: ellipsis; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .battlefield-label { margin-top: 13px; }
   .battlefield { display: flex; min-height: 50px; flex-wrap: wrap; align-content: center; gap: 5px; margin-top: 7px; padding: 7px; border: 1px dashed #34343a; border-radius: 5px; background: rgba(9, 9, 11, .3); }
   .empty-board { width: 100%; color: #5f5f69; font-size: 9px; text-align: center; }

@@ -97,6 +97,117 @@ describe('CommanderValidator', () => {
     expect(result.errors.some(e => e.cardName === 'Plains')).toBe(false);
   });
 
+  it('validates decks with Partner commanders', () => {
+    const partnerA: CardCheckItem = {
+      id: 'p-1',
+      name: 'Vial Smasher the Fierce',
+      quantity: 1,
+      colorIdentity: ['B', 'R'],
+      typeLine: 'Legendary Creature — Goblin Berserker',
+      oracleText: 'Partner',
+      isCommander: true
+    };
+    const partnerB: CardCheckItem = {
+      id: 'p-2',
+      name: 'Thrasios, Triton Hero',
+      quantity: 1,
+      colorIdentity: ['U', 'G'],
+      typeLine: 'Legendary Creature — Merfolk Wizard',
+      oracleText: 'Partner',
+      isCommander: true
+    };
+
+    const cards: CardCheckItem[] = [partnerA, partnerB];
+    for (let i = 1; i <= 98; i++) {
+      cards.push({
+        id: `card-${i}`,
+        name: `Card ${i}`,
+        quantity: 1,
+        colorIdentity: ['U'],
+        typeLine: 'Creature'
+      });
+    }
+
+    const result = validateDeck(cards);
+    expect(result.valid).toBe(true);
+    expect(result.commanderCount).toBe(2);
+    expect(result.colorIdentity).toContain('B');
+    expect(result.colorIdentity).toContain('R');
+    expect(result.colorIdentity).toContain('U');
+    expect(result.colorIdentity).toContain('G');
+    expect(result.warnings.some(w => w.type === 'partner_pairing')).toBe(true);
+  });
+
+  it('validates Background pairing', () => {
+    const commander: CardCheckItem = {
+      id: 'c-1',
+      name: 'Abdel Adrian, Gorion\'s Ward',
+      quantity: 1,
+      colorIdentity: ['W'],
+      typeLine: 'Legendary Creature — Human Warrior',
+      oracleText: 'Choose a Background',
+      isCommander: true
+    };
+    const background: CardCheckItem = {
+      id: 'b-1',
+      name: 'Candlekeep Sage',
+      quantity: 1,
+      colorIdentity: ['U'],
+      typeLine: 'Legendary Enchantment — Background',
+      oracleText: 'Commander creatures you own have...',
+      isCommander: true
+    };
+
+    const cards: CardCheckItem[] = [commander, background];
+    for (let i = 1; i <= 98; i++) {
+      cards.push({
+        id: `card-${i}`,
+        name: `Card ${i}`,
+        quantity: 1,
+        colorIdentity: ['U'],
+        typeLine: 'Creature'
+      });
+    }
+
+    const result = validateDeck(cards);
+    expect(result.valid).toBe(true);
+    expect(result.commanderCount).toBe(2);
+    expect(result.colorIdentity).toContain('W');
+    expect(result.colorIdentity).toContain('U');
+  });
+
+  it('extracts color identity correctly for MDFCs and split cards', () => {
+    const cards: CardCheckItem[] = [
+      commanderAtraya,
+      {
+        id: 'mdfc-1',
+        name: 'Bala Ged Recovery // Bala Ged Sanctuary',
+        quantity: 1,
+        colorIdentity: ['G'],
+        typeLine: 'Sorcery // Land'
+      },
+      {
+        id: 'split-1',
+        name: 'Commit // Memory',
+        quantity: 1,
+        colorIdentity: ['U'],
+        typeLine: 'Instant // Sorcery'
+      }
+    ];
+    for (let i = 3; i < 100; i++) {
+      cards.push({
+        id: `card-${i}`,
+        name: `Card ${i}`,
+        quantity: 1,
+        colorIdentity: ['W'],
+        typeLine: 'Creature'
+      });
+    }
+
+    const result = validateDeck(cards);
+    expect(result.valid).toBe(true);
+  });
+
   it('passes a fully valid 100-card deck', () => {
     const cards: CardCheckItem[] = [commanderAtraya];
     // 35 Plains
