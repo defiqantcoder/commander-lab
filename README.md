@@ -188,6 +188,54 @@ export const db = new CommanderLabDB();
   - *Acceptance Criteria:* User changes to cards or deck name persist to IndexedDB on click/debounce; saved decks list updates reactively.
   - *Checks:* Changes survive page refresh in browser.
 
+#### 4. Component Integration Cookbook for Copilot
+When implementing bindings in `src/lib/components/DeckStudio.svelte`, `SynergyGraph.svelte`, and `GoldfishView.svelte`, use these pre-tested module contracts:
+
+```typescript
+// 1. Live Scryfall Search & Autocomplete ($lib/api/scryfall)
+import { autocompleteCardName, searchCards, getCardByName } from '$lib/api/scryfall';
+
+let searchInput = $state('');
+let suggestions = $state<string[]>([]);
+
+async function onType(query: string) {
+  if (query.trim().length >= 2) {
+    suggestions = await autocompleteCardName(query);
+  } else {
+    suggestions = [];
+  }
+}
+
+// 2. Real Salt Score & Power Level Analysis ($lib/engine/synergy)
+import { auditDeckSaltAndPower, generateSynergyGraph } from '$lib/engine/synergy';
+
+function analyzeDeck(currentCards: DeckCard[]) {
+  const audit = auditDeckSaltAndPower(currentCards);
+  // audit.totalSaltScore -> number (e.g. 3.4)
+  // audit.estimatedPowerBracket -> 'Casual' | 'Focused' | 'Optimized' | 'Competitive'
+  // audit.highSaltCards -> Array<{ name, score, reason }>
+  
+  const graphData = generateSynergyGraph(currentCards);
+  // graphData.nodes -> typed nodes with roles and cmc
+  // graphData.edges -> animated combo links and synergy connections
+}
+
+// 3. Interactive Goldfish Simulator ($lib/engine/goldfish)
+import { GoldfishSimulator } from '$lib/engine/goldfish';
+
+const sim = new GoldfishSimulator(deckCards);
+const handEval = sim.evaluateHand(); // { quality: 'Excellent'|'Good'|'Risky'|'Unplayable', recommendation }
+sim.autoPlayTurn(); // executes turn, draws card, plays land, updates mana
+// sim.hand, sim.battlefield, sim.graveyard, sim.manaAvailable, sim.turnNumber
+
+// 4. Dexie IndexedDB Persistence ($lib/db)
+import { getAllDecks, saveDeck, getDeck } from '$lib/db';
+
+async function persistCurrentDeck(currentDeck: SavedDeck) {
+  await saveDeck(currentDeck);
+}
+```
+
 #### 4. Antigravity Next Tasks (Parallel Track)
 - **Task A1:** Review, test, and merge Jules PRs #5 through #14 into `main`.
 - **Task A2:** Add Dexie offline mock tests and verify browser storage edge cases.
