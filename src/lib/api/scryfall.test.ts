@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { calculateReprintRisk, type ScryfallCard } from './scryfall';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { calculateReprintRisk, getCardById, type ScryfallCard } from './scryfall';
 
 describe('ScryfallAPI', () => {
   it('returns 0 reprint risk for Reserved List cards', () => {
@@ -58,5 +58,50 @@ describe('ScryfallAPI', () => {
 
     expect(calculateReprintRisk(cheapCard)).toBe(10);
   });
-});
 
+  describe('getCardById', () => {
+    const originalFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('successfully fetches a card by ID', async () => {
+      const mockCard = { id: 'mock-uuid', name: 'Black Lotus' };
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockCard
+      });
+
+      const result = await getCardById('mock-uuid');
+
+      expect(result).toEqual(mockCard);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api.scryfall.com/cards/mock-uuid',
+        expect.any(Object)
+      );
+    });
+
+    it('throws an error when the card is not found (404)', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found'
+      });
+
+      await expect(getCardById('non-existent-id')).rejects.toThrow('Card or query not found (404)');
+    });
+
+    it('throws a generic error on other API failures', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error'
+      });
+
+      await expect(getCardById('error-id')).rejects.toThrow('Scryfall API error: 500 Internal Server Error');
+    });
+  });
+
+});
