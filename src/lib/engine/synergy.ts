@@ -179,6 +179,13 @@ export function auditDeckSaltAndPower(cards: CardSynergyInput[]): SaltScoreAudit
   let totalSalt = 0;
   const highSaltList: Array<{ name: string; score: number; reason: string }> = [];
 
+  const freeSpellsRegex = /Force of Will|Force of Negation|Fierce Guardianship|Deflecting Swat|Pact of Negation/i;
+  const fastManaRegex = /Sol Ring|Mana Vault|Chrome Mox|Mox Diamond|Lotus Petal/i;
+  let hasThoracle = false;
+  let hasThoracleEnabler = false;
+  let hasFreeSpells = 0;
+  let fastManaCount = 0;
+
   for (const card of cards) {
     const saltInfo = NOTORIOUS_SALT_CARDS[card.name];
     if (saltInfo) {
@@ -189,15 +196,21 @@ export function auditDeckSaltAndPower(cards: CardSynergyInput[]): SaltScoreAudit
         reason: saltInfo.reason
       });
     }
+
+    if (card.name === "Thassa's Oracle") {
+      hasThoracle = true;
+    } else if (card.name === 'Demonic Consultation' || card.name === 'Tainted Pact') {
+      hasThoracleEnabler = true;
+    }
+
+    if (freeSpellsRegex.test(card.name)) hasFreeSpells++;
+    if (fastManaRegex.test(card.name)) fastManaCount++;
   }
 
   const avgSalt = cards.length > 0 ? Number((totalSalt / cards.length).toFixed(3)) : 0;
 
   // Check fast mana and combo density to determine power level
-  const hasThoracleCombo = cards.some(c => c.name === "Thassa's Oracle") &&
-    cards.some(c => c.name === 'Demonic Consultation' || c.name === 'Tainted Pact');
-  const hasFreeSpells = cards.filter(c => /Force of Will|Force of Negation|Fierce Guardianship|Deflecting Swat|Pact of Negation/i.test(c.name)).length;
-  const fastManaCount = cards.filter(c => /Sol Ring|Mana Vault|Chrome Mox|Mox Diamond|Lotus Petal/i.test(c.name)).length;
+  const hasThoracleCombo = hasThoracle && hasThoracleEnabler;
 
   let power = 5.0; // Baseline casual-focused
   if (highSaltList.length > 3) power += 1.5;
