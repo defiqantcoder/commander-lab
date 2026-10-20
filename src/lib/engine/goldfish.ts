@@ -295,7 +295,7 @@ export class GoldfishSimulator {
       .sort((a, b) => b.cmc - a.cmc);
 
     while (playableSpells.length > 0 && this.manaAvailable > 0) {
-      const spell = playableSpells[0];
+      const spell = playableSpells.shift()!;
       if (this.manaAvailable >= spell.cmc) {
         this.castSpell(spell.id);
         actions.push({
@@ -304,9 +304,9 @@ export class GoldfishSimulator {
           description: `Cast spell: ${spell.name} (CMC ${spell.cmc})`
         });
       }
-      playableSpells = this.hand
-        .filter(c => !/land/i.test(c.typeLine) && c.cmc <= this.manaAvailable)
-        .sort((a, b) => b.cmc - a.cmc);
+      // Instead of completely re-evaluating and sorting this.hand,
+      // just filter the remaining sorted playable spells against new mana available
+      playableSpells = playableSpells.filter(c => c.cmc <= this.manaAvailable);
     }
 
     actions.push({
