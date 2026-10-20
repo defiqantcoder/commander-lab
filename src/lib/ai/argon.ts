@@ -26,10 +26,20 @@ export interface GeneratedDeckResult {
 }
 
 export function getGeminiApiKey(): string | null {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const key = window.localStorage.getItem('gemini_api_key');
+    if (key) return key;
+  }
   if (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) {
     return process.env.GEMINI_API_KEY;
   }
   return null;
+}
+
+export function setGeminiApiKey(key: string): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.setItem('gemini_api_key', key.trim());
+  }
 }
 
 /**

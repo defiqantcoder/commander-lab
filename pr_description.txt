@@ -1,0 +1,5 @@
+Revert "🔒 fix: remove insecure localStorage API key storage"
+
+🎯 What: Reverting the previous security fix that removed the local storage logic for the Gemini API Key.
+⚠️ Risk: Removing the localStorage functionality broke the core offline/client-side storage requirement of the PWA architecture.
+🛡️ Solution: Restoring the client-side API key configuration utilizing localStorage.
