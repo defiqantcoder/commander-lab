@@ -172,12 +172,20 @@ export function classifyCardRole(card: CardSynergyInput): 'commander' | 'ramp' |
   return 'other';
 }
 
+const FREE_SPELLS = new Set(['Force of Will', 'Force of Negation', 'Fierce Guardianship', 'Deflecting Swat', 'Pact of Negation']);
+const FAST_MANA = new Set(['Sol Ring', 'Mana Vault', 'Chrome Mox', 'Mox Diamond', 'Lotus Petal']);
+
 /**
  * Audits Salt Score & Power Level of a deck
  */
 export function auditDeckSaltAndPower(cards: CardSynergyInput[]): SaltScoreAudit {
   let totalSalt = 0;
   const highSaltList: Array<{ name: string; score: number; reason: string }> = [];
+
+  let hasThoracle = false;
+  let hasConsultationOrPact = false;
+  let hasFreeSpells = 0;
+  let fastManaCount = 0;
 
   for (const card of cards) {
     const saltInfo = NOTORIOUS_SALT_CARDS[card.name];
@@ -189,15 +197,26 @@ export function auditDeckSaltAndPower(cards: CardSynergyInput[]): SaltScoreAudit
         reason: saltInfo.reason
       });
     }
+
+    if (card.name === "Thassa's Oracle") {
+      hasThoracle = true;
+    } else if (card.name === 'Demonic Consultation' || card.name === 'Tainted Pact') {
+      hasConsultationOrPact = true;
+    }
+
+    if (FREE_SPELLS.has(card.name)) {
+      hasFreeSpells++;
+    }
+
+    if (FAST_MANA.has(card.name)) {
+      fastManaCount++;
+    }
   }
 
   const avgSalt = cards.length > 0 ? Number((totalSalt / cards.length).toFixed(3)) : 0;
 
   // Check fast mana and combo density to determine power level
-  const hasThoracleCombo = cards.some(c => c.name === "Thassa's Oracle") &&
-    cards.some(c => c.name === 'Demonic Consultation' || c.name === 'Tainted Pact');
-  const hasFreeSpells = cards.filter(c => /Force of Will|Force of Negation|Fierce Guardianship|Deflecting Swat|Pact of Negation/i.test(c.name)).length;
-  const fastManaCount = cards.filter(c => /Sol Ring|Mana Vault|Chrome Mox|Mox Diamond|Lotus Petal/i.test(c.name)).length;
+  const hasThoracleCombo = hasThoracle && hasConsultationOrPact;
 
   let power = 5.0; // Baseline casual-focused
   if (highSaltList.length > 3) power += 1.5;
@@ -320,8 +339,17 @@ export function generateSynergyGraph(cards: CardSynergyInput[]): SynergyGraphDat
 
   // If no known combo pairs found, build theme/engine chain from high-impact cards
   if (edges.length === 0 && cards.length > 0) {
-    const engines = cards.filter(c => classifyCardRole(c) === 'engine').slice(0, 4);
-    const payoffs = cards.filter(c => classifyCardRole(c) === 'payoff').slice(0, 3);
+    const engines: CardSynergyInput[] = [];
+    const payoffs: CardSynergyInput[] = [];
+    for (const c of cards) {
+      if (engines.length >= 4 && payoffs.length >= 3) break;
+      const role = classifyCardRole(c);
+      if (role === 'engine' && engines.length < 4) {
+        engines.push(c);
+      } else if (role === 'payoff' && payoffs.length < 3) {
+        payoffs.push(c);
+      }
+    }
 
     engines.forEach((eng, i) => {
       const engId = `node-eng-${eng.id || i}`;

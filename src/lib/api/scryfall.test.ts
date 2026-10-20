@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { calculateReprintRisk, getCardById, type ScryfallCard } from './scryfall';
+import { calculateReprintRisk, getCardById, autocompleteCardName, type ScryfallCard } from './scryfall';
 
 vi.mock('$lib/db', () => ({
   db: {
@@ -123,6 +123,36 @@ describe('ScryfallAPI', () => {
     };
 
     expect(calculateReprintRisk(cheapCard)).toBe(10);
+  });
+
+  describe('getCardById error handling', () => {
+    it('throws an error when the card is not found (404)', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found'
+      });
+
+      await expect(getCardById('non-existent-id')).rejects.toThrow('Card or query not found (404)');
+    });
+
+    it('throws a generic error on API failure', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error'
+      });
+
+      await expect(getCardById('error-id')).rejects.toThrow('Scryfall API error: 500 Internal Server Error');
+    });
+  });
+
+  describe('autocompleteCardName fallback', () => {
+    it('returns empty array on fetch network error', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+      const result = await autocompleteCardName('Black L');
+      expect(result).toEqual([]);
+    });
   });
 });
 

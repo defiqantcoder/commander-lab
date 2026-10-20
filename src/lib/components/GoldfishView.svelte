@@ -35,6 +35,7 @@
   let visibleHand = $derived(selectedTurn === simulator.turnNumber ? handCards.map((card) => card.name) : snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.hand ?? handCards.map((card) => card.name));
   let visibleBattlefield = $derived(selectedTurn === simulator.turnNumber ? battlefieldCards.map((card) => card.name) : snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.battlefield ?? []);
   let visibleActions = $derived(selectedTurn === simulator.turnNumber ? turnActions : snapshots.find((snapshot) => snapshot.turnNumber === selectedTurn)?.actions ?? []);
+  let maxManaCapacity = $derived(Math.max(1, ...snapshots.map((snapshot) => snapshot.manaCapacity)));
 
   function syncFromSimulator(): void {
     handCards = [...simulator.hand];
@@ -65,9 +66,8 @@
 
   function advanceTurn(): void {
     if (!kept || simulator.turnNumber >= 5) return;
-    simulator.startTurn();
+    turnActions = simulator.autoPlayTurn();
     selectedTurn = simulator.turnNumber;
-    turnActions = [{ action: 'draw', description: `Turn ${selectedTurn}: untapped and drew a card.` }];
     activeTab = 'hand';
     syncFromSimulator();
     saveCurrentSnapshot();
@@ -150,6 +150,11 @@
     <button title="More simulation options" aria-label="More simulation options"><MoreHorizontal size={16} /></button>
   </div>
 
+  <div class="mana-progression" aria-label="Mana capacity by turn">
+    <span>Mana progression</span>
+    <div>{#each [1, 2, 3, 4, 5] as turn}<div class:mana-reached={turn <= simulator.turnNumber}><i style={`--mana-height:${((snapshots.find((snapshot) => snapshot.turnNumber === turn)?.manaCapacity ?? 0) / maxManaCapacity) * 100}%`}></i><small>T{turn}</small></div>{/each}</div>
+  </div>
+
   <div class="bench-tabs" role="tablist" aria-label="Simulation details">
     <button class:tab-active={activeTab === 'hand'} role="tab" aria-selected={activeTab === 'hand'} onclick={() => activeTab = 'hand'}><Swords size={13} /> Hand & board</button>
     <button class:tab-active={activeTab === 'sequence'} role="tab" aria-selected={activeTab === 'sequence'} onclick={() => activeTab = 'sequence'}><ScrollText size={13} /> Sequence</button>
@@ -219,6 +224,12 @@
   .board-summary strong { color: #e4e4e7; font-family: var(--mono); font-size: 12px; font-weight: 500; }
   .board-summary small { color: #74747e; font-family: 'Space Grotesk', sans-serif; font-size: 9px; font-weight: 400; }
   .board-summary button { display: grid; width: 24px; height: 24px; place-items: center; border: 0; background: transparent; color: #777780; }
+  .mana-progression { display:grid; grid-template-columns:1fr 3fr; align-items:center; gap:8px; margin-top:9px; color:#777780; font:8px var(--mono); }
+  .mana-progression>div { display:grid; height:34px; grid-template-columns:repeat(5,1fr); align-items:end; gap:4px; }
+  .mana-progression>div>div { display:flex; height:100%; flex-direction:column; align-items:center; justify-content:end; gap:3px; }
+  .mana-progression i { display:block; width:100%; height:max(3px,var(--mana-height)); border-radius:2px 2px 0 0; background:#34343a; }
+  .mana-progression .mana-reached i { background:linear-gradient(0deg,#0e7490,#38bdf8); }
+  .mana-progression small { color:#666671; font:7px var(--mono); }
   .bench-tabs { display: flex; gap: 13px; margin-top: 14px; border-bottom: 1px solid #29292e; }
   .bench-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 0 1px 8px; border: 0; border-bottom: 1px solid transparent; background: transparent; color: #777780; font-size: 9px; cursor: pointer; }
   .bench-tabs button.tab-active { border-bottom-color: #38bdf8; color: #c4c4cb; }

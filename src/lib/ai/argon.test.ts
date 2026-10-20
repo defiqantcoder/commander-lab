@@ -1,5 +1,73 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getGeminiApiKey, setGeminiApiKey } from './argon';
+import { getGeminiApiKey, setGeminiApiKey, brainstormArchetypes } from './argon';
+
+// Mock the @google/genai module
+const mockGenerateContent = vi.fn();
+vi.mock('@google/genai', () => {
+  return {
+    GoogleGenAI: vi.fn().mockImplementation(() => {
+      return {
+        models: {
+          generateContent: mockGenerateContent
+        }
+      };
+    }),
+    Type: {
+      ARRAY: 'ARRAY',
+      OBJECT: 'OBJECT',
+      STRING: 'STRING'
+    }
+  };
+});
+
+describe('argon', () => {
+  describe('brainstormArchetypes', () => {
+    it('returns offline suggestions when no API key is provided', async () => {
+      process.env.GEMINI_API_KEY = '';
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('gemini_api_key');
+      }
+      const result = await brainstormArchetypes('Atraxa', ['W', 'U', 'B', 'G']);
+
+      expect(result.length).toBe(3);
+      expect(result[0].themeName).toBe('Atraxa Hidden Engine');
+      expect(mockGenerateContent).not.toHaveBeenCalled();
+    });
+
+    it('returns parsed response when API call is successful', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      const mockSuggestions = [
+        {
+          themeName: 'Test Theme',
+          tagline: 'Test Tagline',
+          powerTier: 'Focused',
+          primaryEngine: 'Test Engine',
+          obscureInteraction: 'Test Interaction',
+          keyWinCon: 'Test WinCon',
+          sampleKeyCards: ['Card 1', 'Card 2']
+        }
+      ];
+      mockGenerateContent.mockResolvedValue({ text: JSON.stringify(mockSuggestions) });
+
+      const result = await brainstormArchetypes('Atraxa', ['W', 'U', 'B', 'G']);
+
+      expect(result).toEqual(mockSuggestions);
+      expect(mockGenerateContent).toHaveBeenCalled();
+    });
+
+    it('returns an empty array and logs error when generateContent throws', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      mockGenerateContent.mockRejectedValue(new Error('API Error'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await brainstormArchetypes('Atraxa', ['W', 'U', 'B', 'G']);
+
+      expect(result).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+});
 
 describe('API Key Management', () => {
   const originalEnv = process.env;

@@ -4,12 +4,19 @@
   import { writable } from 'svelte/store';
   import { generateSynergyGraph } from '$lib/engine/synergy';
   import type { SynergyEdge, SynergyGraphData, SynergyNode } from '$lib/engine/synergy';
+  import SynergyGraphNode from './SynergyGraphNode.svelte';
   import type { DeckCard } from './types';
 
   export let cards: DeckCard[] = [];
   export let graphData: SynergyGraphData | null = null;
   const nodes = writable<SynergyNode[]>([]);
   const edges = writable<SynergyEdge[]>([]);
+  const nodeTypes = {
+    commanderNode: SynergyGraphNode,
+    comboNode: SynergyGraphNode,
+    engineNode: SynergyGraphNode,
+    payoffNode: SynergyGraphNode
+  };
   let nodeCount = 0;
   let edgeCount = 0;
 
@@ -29,7 +36,7 @@
   $: edgeCount = graph.edges.length;
 
   function toFlowNodes(): SynergyNode[] {
-    return graph.nodes.map((node) => ({ ...node, type: 'default' }));
+    return graph.nodes.map((node) => ({ ...node, position: { ...node.position } }));
   }
 
   function resetPositions(): void {
@@ -40,7 +47,7 @@
 <div class="graph-shell">
   <div class="graph-toolbar"><span><GitBranch size={13} /> ENGINE MAP</span><button onclick={resetPositions} aria-label="Reset graph layout" title="Reset graph layout"><Focus size={14} /></button></div>
   <div class="flow-stage">
-    <SvelteFlow {nodes} {edges} fitView>
+    <SvelteFlow {nodes} {edges} {nodeTypes} fitView>
       <Background variant={BackgroundVariant.Dots} gap={20} />
       <Controls />
       <MiniMap pannable zoomable />

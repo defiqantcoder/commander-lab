@@ -3,6 +3,8 @@
   import type { DeckCard } from './types';
 
   export let card: DeckCard | null = null;
+  export let inDeck = false;
+  export let ontoggle: (card: DeckCard) => void = () => {};
   export let onclose: () => void = () => {};
 </script>
 
@@ -19,6 +21,7 @@
         <h2 id="detail-title">{card.name}</h2>
         <div class="meta-row"><span class="mana">{card.manaCost}</span><span class="role">{card.role}</span><span class="edition">{card.set.toUpperCase()}</span></div>
         <div class="detail-price"><span>Market price</span><strong>${(card.currentPriceUsd ?? 0).toFixed(2)}</strong>{#if card.foil}<span class="foil"><Sparkles size={13} /> Foil</span>{/if}</div>
+        <button class="deck-toggle" class:in-deck={inDeck} onclick={() => ontoggle(card)}>{inDeck ? 'Remove from deck' : 'Add to deck'}</button>
         <section class="note-block">
           <div class="block-title"><Sparkles size={14} /> Synergy note</div>
           <p>{card.synergyNotes ?? 'Supports the deck’s core plan by adding another layer of value to the counter and proliferate engine.'}</p>
@@ -47,6 +50,9 @@
   .role { color: #7dd3fc; }
   .detail-price { display: flex; align-items: center; gap: 10px; margin: 22px 0 16px; padding: 11px 0; border-block: 1px solid #29292e; color: #8d8d97; font-size: 11px; }
   .detail-price strong { margin-left: auto; color: #bef264; font-family: var(--mono); font-size: 14px; font-weight: 500; }
+  .deck-toggle { min-height:32px; margin:0 0 17px; border:1px solid #3f3f46; border-radius:5px; background:#1b1b20; color:#d4d4d8; font-size:10px; cursor:pointer; }
+  .deck-toggle:hover { border-color:#38bdf8; color:#bae6fd; }
+  .deck-toggle.in-deck { border-color:#28543d; color:#86efac; }
   .foil { display: inline-flex; align-items: center; gap: 4px; color: #e879f9; font-size: 10px; }
   .note-block, .replacement-block { margin-bottom: 16px; }
   .block-title { display: flex; align-items: center; gap: 7px; color: #d4d4d8; font-size: 11px; font-weight: 600; }
