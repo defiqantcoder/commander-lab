@@ -36,7 +36,7 @@
     <div class="empty-state">
       <Sparkles size={24} class="empty-sparkle" />
       <p class="empty-title">Deck is currently empty</p>
-      <p class="empty-subtitle">Search cards above from Scryfall, or click <strong>Decklist I/O</strong> to import your list from clipboard.</p>
+      <p class="empty-subtitle">Search cards above from Scryfall, click <strong>AI Architect</strong> to generate a fresh deck, or click <strong>Decklist I/O</strong> to import your list.</p>
     </div>
   {/if}
 </div>

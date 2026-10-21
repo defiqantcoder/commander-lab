@@ -110,6 +110,9 @@ const UNRESTRICTED_CARD_NAMES = new Set<string>([
   'Seven Dwarves' // Allows up to 7
 ]);
 
+const NORMALIZED_BANLIST = new Set(Array.from(COMMANDER_BANLIST).map((n) => n.toLowerCase().trim()));
+const NORMALIZED_UNRESTRICTED = new Set(Array.from(UNRESTRICTED_CARD_NAMES).map((n) => n.toLowerCase().trim()));
+
 export function validateDeck(cards: CardCheckItem[]): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
@@ -143,15 +146,14 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
   for (const cmd of commanders) {
     // Check if eligible commander
     const isLegendaryCreature = /legendary.*creature/i.test(cmd.typeLine);
-    const isPlaneswalkerCommander =
-      /planeswalker/i.test(cmd.typeLine) && /can be your commander/i.test(cmd.oracleText || '');
+    const hasCommanderClause = /can be your commander/i.test(cmd.oracleText || '');
     const isBackgroundCommander =
       /legendary.*background/i.test(cmd.typeLine);
 
-    if (!isLegendaryCreature && !isPlaneswalkerCommander && !isBackgroundCommander) {
+    if (!isLegendaryCreature && !hasCommanderClause && !isBackgroundCommander) {
       errors.push({
         type: 'invalid_commander',
-        message: `${cmd.name} is not an eligible commander (must be Legendary Creature, eligible Planeswalker, or Background).`,
+        message: `${cmd.name} is not an eligible commander (must be Legendary Creature, Background, or explicitly state it can be your commander).`,
         cardName: cmd.name
       });
     }
@@ -182,7 +184,7 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
     }
 
     // Banlist check
-    if (COMMANDER_BANLIST.has(name)) {
+    if (NORMALIZED_BANLIST.has(name.toLowerCase())) {
       errors.push({
         type: 'banned',
         message: `${name} is banned in the Commander / EDH format.`,
@@ -191,11 +193,11 @@ export function validateDeck(cards: CardCheckItem[]): ValidationResult {
     }
 
     // Singleton check
-    const currentCount = (nameCounts.get(name) || 0) + qty;
-    nameCounts.set(name, currentCount);
+    const currentCount = (nameCounts.get(name.toLowerCase()) || 0) + qty;
+    nameCounts.set(name.toLowerCase(), currentCount);
 
-    if (currentCount > 1 && !UNRESTRICTED_CARD_NAMES.has(name)) {
-      if (name === 'Seven Dwarves' && currentCount <= 7) {
+    if (currentCount > 1 && !NORMALIZED_UNRESTRICTED.has(name.toLowerCase())) {
+      if (name.toLowerCase() === 'seven dwarves' && currentCount <= 7) {
         // Allowed
       } else {
         errors.push({

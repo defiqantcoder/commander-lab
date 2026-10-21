@@ -284,37 +284,64 @@ function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[])
 ## 6. Current Status & Agent Roadmap (Session Hand-off)
 
 ### Accomplished in this Sprint
-1. **Core Architectural Pillar 5 (Market Intelligence & Liquidation Advisor) Fully Implemented:**
-   - **Market Engine (`src/lib/engine/market.ts`):** Dynamic reprint risk calculation (`calculateCardReprintRisk`), portfolio exposure reporting (`analyzeDeckMarketLiquidation`), official WotC Reserved List vault immunity (`KNOWN_RESERVED_LIST`), and curated sub-$2 high-synergy budget swaps (`STAPLE_BUDGET_SWAP_REGISTRY`).
-   - **Market Unit Tests (`src/lib/engine/market.test.ts`):** 10/10 passing tests verifying risk formulas, Reserved List exemption, and savings calculations.
-   - **Market Advisor UI (`src/lib/components/MarketAdvisor.svelte`):** Complete dashboard with health score gauge, reprint risk watchlist, one-click budget swapper, Reserved List vault, and full price matrix.
-2. **Universal Decoupling & Zero Pre-Filled Clean Slate:**
-   - `DeckStudio.svelte` completely purged of hardcoded demo/test cards (`c1`–`c14`).
-   - Starts with a clean empty slate (`cards = []`, prompt to search cards or select commander).
-   - Dynamic mana curve and average CMC calculated in real time from non-land cards.
-   - Dynamic health metrics and deck health score derived from actual card roles.
-   - Dexie collection table connected to the studio (`userCollection`) to track cards owned in collection.
-   - Saved decks list supports switching between user decks, with a "+ New" button to create an empty deck at any time.
-   - Graceful empty states added to CardGrid, Goldfish Bench, Matchup Arena, Pilot Guide, and Market Advisor.
-3. **PR Merges & CI/CD:**
-   - Jules's PR #27 (stress tests for universal playbook engine) merged into `main`. Full test suite now at **80 / 80 passing tests** across 11 test suites.
-   - Created GitHub Actions CI workflow (`.github/workflows/ci.yml`).
-   - All changes committed and pushed to `origin/main` (`789ed9f`).
+1. **Dynamic Hybrid AI Architecture Across Studio, Piloting & Market Intelligence:**
+   - **AI Deck Architect (`src/lib/components/AIDeckArchitectModal.svelte` & `src/lib/ai/gemini.ts`):**
+     - Powered by Google Gemini (`@google/genai`).
+     - Brainstorms 3 distinct, fresh, unconventional deck archetypes for any commander with power tiers (`Casual`, `Focused`, `Optimized`), primary engines, obscure rules interactions, and sample cards.
+     - Generates tailored, cohesive decklists with card roles, CMC, synergy rationales, and budget alternatives across the entire Magic: The Gathering card pool.
+     - **Optional Collection Integration:** Building from the user's collection is purely optional; AI draws from the entire MTG universe by default, with an optional toggle to prioritize owned cards where synergistic.
+     - 1-click **"Load Deck into Studio"** converts generated cards into live Studio cards with instant persistence in IndexedDB.
+   - **AI Piloting & Synergy Deep Scan (`src/lib/components/PilotGuide.svelte`):**
+     - On-demand **"AI Deep Scan"** button dynamically analyzes the user's active deck and collection.
+     - Discovers dynamic multi-card combos, infinite loops, and hidden synergy lines beyond static registries.
+     - Cross-references the user's owned binder in IndexedDB to surface **Owned Collection Upgrades** with 1-click **"Add to Deck"** actions.
+     - Generates bespoke piloting secrets and strategic timing advice.
+   - **AI Liquidation & Sell Timing Advisor (`src/lib/components/MarketAdvisor.svelte`):**
+     - New **"AI Sell Advisory"** tab provides an executive portfolio health verdict.
+     - Recommends optimal sell windows for non-reserved staples before reprint cycles (Masters sets, Commander precons, Horizons products) cause price depreciation.
+     - Recommends high-synergy sub-$2 budget swaps with 1-click execution.
+     - Identifies safe haven assets (Reserved List immunity, low-volatility foundation staples) to vault.
+2. **Comprehensive MTG Rules Audit & Technical Corrections:**
+   - **Shorikai Vehicle Validation (`CR 903.3`):** Updated `validator.ts` to allow *Shorikai, Genesis Engine* and any non-creature card with an explicit commander clause.
+   - **Commander Color Identity (`CR 903.4`, `CR 204.2`):** Updated `extractColors` and game phases to prioritize `commander.colorIdentity` over mana cost parsing (supporting Kenrith, Najeela, Sisay, and Rograkh).
+   - **State-Based Actions & Timing in Combos:**
+     - Corrected *Heliod + Walking Ballista* prerequisites to strictly require $\ge 2$ counters (CR 704.5f).
+     - Corrected *Ashnod's Altar + Nim Deathmantle* token producer requirements to 2+ tokens (*Grave Titan, Weaponcraft Enthusiast, Wurmcoil Engine*).
+     - Corrected *Dualcaster Mage + Twinflame* disruption window to target Dualcaster Mage in response to its ETB trigger.
+     - Clarified *Krenko + Thornbite Staff* sacrifice outlet prerequisite and *Meren + Spore Frog* turn-cycle timing.
+     - Added format-defining combos: *Niv-Mizzet, Parun + Curiosity*, *Witherbloom Apprentice + Chain of Smog*, *Basalt Monolith + Kinnan, Bonder Prodigy*, *Karmic Guide + Reveillark*, and *Dockside Extortionist + Temur Sabertooth*.
+   - **Reserved List Vault Expansion:** Added 20 missing Reserved List staples (*Gilded Drake, Intuition, Time Spiral, Mishra's Workshop, Bazaar of Baghdad, Lake of the Dead, Mind Over Matter*, etc.).
+3. **Test Suite & Build Verification:**
+   - Full Vitest suite is at **98 / 98 passing tests** across 11 test suites.
+   - Vite production build (`npm run build`) succeeds cleanly with PWA service worker precaching.
 
 ---
 
 ### Jules Background Task Assignment (Ready for Submission)
 
-**Task Title:** Add Unit Tests for Market Engine Edge Cases & Dexie Collection Sync (`src/lib/engine/market-stress.test.ts`)
+**Task Title:** Add Vitest Unit Tests for AI Deck Generation, AI Deep Scan, and AI Market Advisor (`src/lib/ai/ai-features-stress.test.ts`)
 
 **Task Description:**
 ```text
-Write offline Vitest stress tests in `src/lib/engine/market-stress.test.ts` for the Market Intelligence & Liquidation Engine (`src/lib/engine/market.ts`):
-1. Test extreme card price boundaries ($0.00 basic lands, $0.05 bulk commons, $1.99 budget threshold, $10,000+ power nine cards).
-2. Test Reserved List variations (case-insensitivity, apostrophes like "Gaea's Cradle" vs "Gaeas Cradle", dual lands, drop of honey).
-3. Test portfolio liquidation calculations on decks with 0 cards, 100% budget cards, 100% Reserved List cards, and 100% reprint-vulnerable cards.
-4. Verify calculateCardReprintRisk correctly handles foil status (+10 score) and basic land type lines.
-5. Do NOT edit any UI components or make any outbound network calls (mock or use local fixtures only).
-6. Ensure `npm test` passes cleanly.
+Write comprehensive offline Vitest unit tests in `src/lib/ai/ai-features-stress.test.ts` verifying the new AI-powered features in `src/lib/ai/gemini.ts`:
+1. Test `generateFreshDeckWithAI`:
+   - Verify it functions offline without an API key (returns valid deck structure with categories, cmc, and synergyRationale).
+   - Verify it accepts optional user collection card arrays without failing when empty or omitted.
+   - Test mocked API responses with diverse archetypes (Artifact Storm, Spellslinger, Voltron, Enchantress).
+2. Test `analyzeDeckWithAI`:
+   - Verify offline fallback returns dynamicCombos, collectionUpgrades, and pilotingSecrets.
+   - Test mocked response with multi-card infinite combos and owned collection upgrades.
+3. Test `analyzeMarketWithAI`:
+   - Verify offline fallback correctly calculates sell recommendations for non-reserved cards over $15 and identifies Reserved List cards as safe havens.
+   - Test mocked response with urgency classifications ('Immediate', 'Upcoming Cycle', 'Monitor').
+4. Ensure no outbound network calls are made (mock @google/genai cleanly as done in gemini.test.ts).
+5. Ensure `npm test` passes cleanly with 100% green tests.
 ```
+
+---
+
+### Next Steps for Next Session
+1. **Interactive Node Visualizer Optimization (`src/lib/components/SynergyGraph.svelte`):** Connect AI-discovered dynamic combos directly into the interactive Svelte Flow graph so AI-uncovered loops render as highlighted cyclic nodes.
+2. **Collection Bulk Import (CSV / Delver Lens / ManaBox):** Add a 1-click bulk CSV / text import in the collection view so users can paste their binders into Dexie in seconds.
+3. **Goldfish AI Play-by-Play Coach:** Allow Gemini to evaluate the goldfish simulator hand on each turn and recommend optimal sequence lines.
 

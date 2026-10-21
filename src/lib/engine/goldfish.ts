@@ -7,6 +7,7 @@ export interface SimCard {
   oracleText?: string;
   category?: string;
   isCommander?: boolean;
+  colorIdentity?: string[];
 }
 
 export interface SimTurnAction {

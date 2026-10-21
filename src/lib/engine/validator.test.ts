@@ -234,5 +234,57 @@ describe('CommanderValidator', () => {
     expect(result.valid).toBe(true);
     expect(result.errors.length).toBe(0);
   });
+
+  it('accepts Shorikai, Genesis Engine as an eligible commander under CR 903.3', () => {
+    const shorikai: CardCheckItem = {
+      id: 'shorikai-1',
+      name: 'Shorikai, Genesis Engine',
+      quantity: 1,
+      colorIdentity: ['W', 'U'],
+      typeLine: 'Legendary Artifact — Vehicle',
+      oracleText: 'Crew 8. Shorikai, Genesis Engine can be your commander.',
+      isCommander: true
+    };
+
+    const cards: CardCheckItem[] = [shorikai];
+    for (let i = 1; i < 100; i++) {
+      cards.push({
+        id: `card-${i}`,
+        name: `Card ${i}`,
+        quantity: 1,
+        colorIdentity: ['W'],
+        typeLine: 'Artifact'
+      });
+    }
+
+    const result = validateDeck(cards);
+    expect(result.errors.some((e) => e.type === 'invalid_commander')).toBe(false);
+  });
+
+  it('permits up to 7 copies of Seven Dwarves', () => {
+    const cards: CardCheckItem[] = [
+      commanderAtraya,
+      {
+        id: 'dwarf-1',
+        name: 'Seven Dwarves',
+        quantity: 7,
+        colorIdentity: ['R'], // Notice Red will flag color identity, so let's test singleton specifically
+        typeLine: 'Creature — Dwarf'
+      }
+    ];
+
+    for (let i = 8; i < 100; i++) {
+      cards.push({
+        id: `card-${i}`,
+        name: `Card ${i}`,
+        quantity: 1,
+        colorIdentity: ['W'],
+        typeLine: 'Creature'
+      });
+    }
+
+    const result = validateDeck(cards);
+    expect(result.errors.some((e) => e.type === 'singleton')).toBe(false);
+  });
 });
 

@@ -47,7 +47,13 @@ export const KNOWN_RESERVED_LIST = new Set([
   'chains of mephistopheles', 'the abyss', 'nether void', 'eureka', 'drop of honey',
   'tabernacle at pendrell vale', 'the tabernacle at pendrell vale',
   'metalworker', 'treachery', 'palinchron', 'academy rector', 'replenish',
-  'earthcraft', 'aluren', 'corpse dance', 'null rod', 'humility', 'slivers queen', "sliver queen"
+  'earthcraft', 'aluren', 'corpse dance', 'null rod', 'humility', 'slivers queen', "sliver queen",
+  'gilded drake', 'intuition', 'time spiral', 'copy artifact', 'transmute artifact',
+  'power artifact', 'volrath\'s stronghold', 'volraths stronghold', 'lake of the dead',
+  'yavimaya hollow', 'mind over matter', 'memory jar', 'squandered resources',
+  'anvil of bogardan', 'winding canyons', 'scorched ruins', 'bazaar of baghdad',
+  'mishra\'s workshop', 'mishras workshop', 'candelabra of tawnos',
+  'hazezon tamar', 'angus mackenzie'
 ]);
 
 // Master registry of high-value staples to sub-$2 high-synergy equivalents

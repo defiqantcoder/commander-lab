@@ -73,7 +73,8 @@
       manaCost: card.manaCost,
       oracleText: card.oracleText,
       category: isCommander ? 'commander' : card.role,
-      isCommander
+      isCommander,
+      colorIdentity: card.colorIdentity
     };
   }
 

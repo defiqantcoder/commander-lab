@@ -3,9 +3,12 @@
     AlertTriangle,
     ArrowLeftRight,
     ArrowRight,
+    BrainCircuit,
     CheckCircle2,
     CircleDollarSign,
+    Clock,
     Coins,
+    Loader2,
     Lock,
     RefreshCw,
     Shield,
@@ -22,6 +25,10 @@
     type MarketReplacement,
     type PortfolioLiquidationReport
   } from '$lib/engine/market';
+  import {
+    analyzeMarketWithAI,
+    type AIMarketAnalysisResult
+  } from '$lib/ai/gemini';
   import type { DeckCard } from './types';
 
   let {
@@ -36,10 +43,34 @@
     onApplySwap?: (originalCardName: string, replacementCardName: string) => Promise<void> | void;
   } = $props();
 
-  let activeTab = $state<'watchlist' | 'swaps' | 'vault' | 'matrix'>('watchlist');
+  let activeTab = $state<'watchlist' | 'swaps' | 'vault' | 'matrix' | 'ai-advisor'>('watchlist');
   let filterRisk = $state<'all' | 'high' | 'safe' | 'reserved'>('all');
   let swappingCard = $state<string | null>(null);
   let swapSuccessMessage = $state<string | null>(null);
+
+  let isAnalyzingMarket = $state(false);
+  let aiMarketReport = $state<AIMarketAnalysisResult | null>(null);
+  let aiMarketError = $state<string | null>(null);
+
+  async function runAIMarketAnalysis(): Promise<void> {
+    if (cards.length === 0) return;
+    isAnalyzingMarket = true;
+    aiMarketError = null;
+    try {
+      const inputCards = cards.map((c) => ({
+        name: c.name,
+        currentPriceUsd: c.currentPriceUsd,
+        typeLine: c.typeLine,
+        isReserved: report.reservedListCards.some((rc) => rc.name.toLowerCase() === c.name.toLowerCase())
+      }));
+      const result = await analyzeMarketWithAI(inputCards);
+      aiMarketReport = result;
+    } catch (err) {
+      aiMarketError = err instanceof Error ? err.message : 'AI market analysis failed.';
+    } finally {
+      isAnalyzingMarket = false;
+    }
+  }
 
   let report = $derived<PortfolioLiquidationReport>(
     analyzeDeckMarketLiquidation(cards, commander)
@@ -221,6 +252,10 @@
     <button class:active={activeTab === 'matrix'} onclick={() => (activeTab = 'matrix')}>
       <Coins size={13} />
       <span>Price Matrix</span>
+    </button>
+    <button class:active={activeTab === 'ai-advisor'} onclick={() => { activeTab = 'ai-advisor'; if (!aiMarketReport && !isAnalyzingMarket) runAIMarketAnalysis(); }}>
+      <Sparkles size={13} class="text-sky" />
+      <span>AI Sell Advisory</span>
     </button>
   </nav>
 
@@ -455,6 +490,128 @@
           </tbody>
         </table>
       </div>
+    </section>
+
+  <!-- Tab 5: AI Liquidation & Sell Timing Advisor -->
+  {:else if activeTab === 'ai-advisor'}
+    <section class="section-pane enter">
+      <div class="pane-header">
+        <div>
+          <h3>AI Liquidation & Sell Timing Advisory</h3>
+          <p>Powered by Google Gemini · Identifies peak market prices, upcoming reprint cycle windows, and budget swaps.</p>
+        </div>
+        <button class="subtle-button" onclick={runAIMarketAnalysis} disabled={isAnalyzingMarket}>
+          {#if isAnalyzingMarket}
+            <Loader2 size={13} class="spinner" /> Analyzing Market...
+          {:else}
+            <RefreshCw size={13} /> Re-scan with Gemini
+          {/if}
+        </button>
+      </div>
+
+      {#if isAnalyzingMarket}
+        <div class="ai-loading-box">
+          <Loader2 size={32} class="spinner text-sky" />
+          <h4>Gemini AI is analyzing your portfolio...</h4>
+          <p>Cross-referencing reprint calendars, format demand cycles, peak price trajectories, and high-synergy budget alternatives...</p>
+        </div>
+      {:else if aiMarketError}
+        <div class="error-banner">
+          <span>{aiMarketError}</span>
+        </div>
+      {:else if aiMarketReport}
+        <div class="ai-market-content">
+          <div class="verdict-banner">
+            <div class="verdict-icon">
+              <Sparkles size={20} class="text-sky" />
+            </div>
+            <div class="verdict-text">
+              <strong>Executive Market Verdict: {aiMarketReport.portfolioHealthAssessment}</strong>
+              <p>{aiMarketReport.overallMarketVerdict}</p>
+            </div>
+          </div>
+
+          <div class="sell-section">
+            <div class="section-title-row">
+              <TrendingDown size={16} class="text-red" />
+              <h4>Recommended Sales & Liquidation Swaps</h4>
+              <small>Cards to sell before impending reprint cycles cause sharp depreciation</small>
+            </div>
+
+            {#if aiMarketReport.sellRecommendations.length === 0}
+              <div class="empty-state mini">
+                <ShieldCheck size={24} class="text-emerald" />
+                <p>No critical sale triggers identified. Your deck has low exposure to impending reprint drops.</p>
+              </div>
+            {:else}
+              <div class="sell-grid">
+                {#each aiMarketReport.sellRecommendations as rec}
+                  <div class="sell-card">
+                    <div class="sell-card-head">
+                      <div>
+                        <span class={`urgency-pill urgency-${rec.urgency.toLowerCase().replace(/\s+/g, '-')}`}>{rec.urgency}</span>
+                        <strong class="sell-card-name">{rec.cardName}</strong>
+                      </div>
+                      <span class="sell-price">${rec.currentPriceUsd.toFixed(2)}</span>
+                    </div>
+
+                    <p class="sell-reason">{rec.reasonToSell}</p>
+
+                    <div class="reprint-window">
+                      <Clock size={11} />
+                      <span>Projected reprint window: <strong>{rec.projectedReprintWindow}</strong></span>
+                    </div>
+
+                    {#if rec.budgetSwap}
+                      <div class="budget-swap-box">
+                        <div class="swap-info">
+                          <span class="swap-label">Recommended Budget Swap:</span>
+                          <span class="swap-target">{rec.budgetSwap}</span>
+                          {#if rec.estimatedSavings}
+                            <span class="savings-tag">Save ~${rec.estimatedSavings.toFixed(2)}</span>
+                          {/if}
+                        </div>
+                        {#if onApplySwap}
+                          <button
+                            class="apply-swap-btn"
+                            disabled={swappingCard === rec.cardName}
+                            onclick={() => handleSwap({ originalCard: rec.cardName, originalPrice: rec.currentPriceUsd, replacementCard: rec.budgetSwap!, replacementPrice: 1.50, savings: rec.estimatedSavings ?? (rec.currentPriceUsd - 1.50), synergyScore: 90, rationale: 'AI suggested liquidation swap' })}
+                          >
+                            <ArrowLeftRight size={11} />
+                            {swappingCard === rec.cardName ? 'Swapping...' : 'Swap to Budget'}
+                          </button>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          {#if aiMarketReport.safeHavenHoldings.length > 0}
+            <div class="safe-section">
+              <div class="section-title-row">
+                <ShieldCheck size={16} class="text-emerald" />
+                <h4>Safe Haven Holdings to Vault</h4>
+                <small>Assets immune to reprint depreciation or foundation staples</small>
+              </div>
+
+              <div class="safe-grid">
+                {#each aiMarketReport.safeHavenHoldings as safe}
+                  <div class="safe-card">
+                    <div class="safe-card-head">
+                      <strong>{safe.cardName}</strong>
+                      <span class="safe-price">${safe.currentPriceUsd.toFixed(2)}</span>
+                    </div>
+                    <p class="safe-reason">{safe.reasonToHold}</p>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/if}
     </section>
   {/if}
 </div>
@@ -1199,6 +1356,286 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  /* AI Sell Advisory styles */
+  .ai-loading-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3.5rem 1rem;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .ai-loading-box h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #f8fafc;
+  }
+
+  .ai-loading-box p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    max-width: 480px;
+  }
+
+  .ai-market-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .verdict-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+
+  .verdict-text strong {
+    display: block;
+    color: #38bdf8;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .verdict-text p {
+    margin: 0;
+    font-size: 0.825rem;
+    color: #cbd5e1;
+    line-height: 1.45;
+  }
+
+  .section-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .section-title-row h4 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #f8fafc;
+  }
+
+  .section-title-row small {
+    color: #64748b;
+    font-size: 0.75rem;
+  }
+
+  .sell-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+
+  .sell-card {
+    background: #0f172a;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .sell-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .sell-card-name {
+    display: block;
+    color: #f8fafc;
+    font-size: 0.95rem;
+    margin-top: 0.25rem;
+  }
+
+  .sell-price {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #f87171;
+  }
+
+  .urgency-pill {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  .urgency-immediate {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+  }
+
+  .urgency-upcoming-cycle {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+  }
+
+  .urgency-monitor {
+    background: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+  }
+
+  .sell-reason {
+    margin: 0;
+    font-size: 0.775rem;
+    color: #cbd5e1;
+    line-height: 1.4;
+  }
+
+  .reprint-window {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.725rem;
+    color: #94a3b8;
+  }
+
+  .reprint-window strong {
+    color: #fbbf24;
+  }
+
+  .budget-swap-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 6px;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .swap-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .swap-label {
+    font-size: 0.65rem;
+    color: #6ee7b7;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .swap-target {
+    font-size: 0.825rem;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  .savings-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #4ade80;
+  }
+
+  .apply-swap-btn {
+    background: #059669;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.725rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+
+  .apply-swap-btn:hover:not(:disabled) {
+    background: #047857;
+  }
+
+  .apply-swap-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .safe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.85rem;
+  }
+
+  .safe-card {
+    background: #0f172a;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .safe-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .safe-card-head strong {
+    color: #f8fafc;
+    font-size: 0.875rem;
+  }
+
+  .safe-price {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #34d399;
+  }
+
+  .safe-reason {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    line-height: 1.35;
+  }
+
+  .empty-state.mini {
+    padding: 2rem 1rem;
+  }
+
+  .subtle-button {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.8);
+    color: #cbd5e1;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.15s ease;
+  }
+
+  .subtle-button:hover:not(:disabled) {
+    background: rgba(51, 65, 85, 0.8);
+    color: #f8fafc;
   }
 </style>
 

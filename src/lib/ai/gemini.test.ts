@@ -5,6 +5,9 @@ import {
   clearGeminiApiKey,
   testGeminiApiKey,
   brainstormArchetypes,
+  generateFreshDeckWithAI,
+  analyzeDeckWithAI,
+  analyzeMarketWithAI,
   GEMINI_DEFAULT_MODEL
 } from './gemini';
 
@@ -22,12 +25,18 @@ vi.mock('@google/genai', () => {
     Type: {
       ARRAY: 'ARRAY',
       OBJECT: 'OBJECT',
-      STRING: 'STRING'
+      STRING: 'STRING',
+      NUMBER: 'NUMBER',
+      BOOLEAN: 'BOOLEAN'
     }
   };
 });
 
 describe('gemini engine', () => {
+  beforeEach(() => {
+    mockGenerateContent.mockClear();
+  });
+
   describe('brainstormArchetypes', () => {
     it('returns offline suggestions when no API key is provided', async () => {
       process.env.GEMINI_API_KEY = '';
@@ -74,6 +83,198 @@ describe('gemini engine', () => {
       const result = await brainstormArchetypes('Atraxa', ['W', 'U', 'B', 'G']);
 
       expect(result).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('generateFreshDeckWithAI', () => {
+    it('returns offline deck structure when no API key is provided and collection is optional', async () => {
+      process.env.GEMINI_API_KEY = '';
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('gemini_api_key');
+      }
+
+      // Without collection
+      const resultNoCollection = await generateFreshDeckWithAI('Krenko, Mob Boss', ['R'], 'Goblin Swarm');
+      expect(resultNoCollection.commanderName).toBe('Krenko, Mob Boss');
+      expect(resultNoCollection.cards.length).toBeGreaterThan(0);
+      expect(mockGenerateContent).not.toHaveBeenCalled();
+
+      // With optional collection
+      const resultWithCollection = await generateFreshDeckWithAI('Krenko, Mob Boss', ['R'], 'Goblin Swarm', ['Sol Ring', 'Goblin Chieftain']);
+      expect(resultWithCollection.commanderName).toBe('Krenko, Mob Boss');
+      expect(resultWithCollection.cards.length).toBeGreaterThan(0);
+    });
+
+    it('returns parsed generated deck when API call succeeds', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      const mockDeck = {
+        commanderName: 'Krenko, Mob Boss',
+        archetype: 'Goblin Burn & Tokens',
+        estimatedSaltScore: 35,
+        cards: [
+          { name: 'Goblin Bombardment', category: 'payoff', cmc: 2, synergyRationale: 'Converts infinite tokens into table-wide lethal burn.' },
+          { name: 'Skirk Prospector', category: 'ramp', cmc: 1, synergyRationale: 'Sacrifice outlet for red mana acceleration.' }
+        ]
+      };
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockDeck) });
+
+      const result = await generateFreshDeckWithAI('Krenko, Mob Boss', ['R'], 'Goblin Burn & Tokens', ['Skirk Prospector']);
+      expect(result.commanderName).toBe('Krenko, Mob Boss');
+      expect(result.cards.length).toBe(2);
+      expect(result.cards[0].name).toBe('Goblin Bombardment');
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: GEMINI_DEFAULT_MODEL
+        })
+      );
+    });
+
+    it('handles API errors gracefully during deck generation', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      mockGenerateContent.mockRejectedValueOnce(new Error('Generation Error'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await generateFreshDeckWithAI('Krenko, Mob Boss', ['R'], 'Goblin Burn');
+      expect(result.cards).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('analyzeDeckWithAI', () => {
+    it('returns offline deck analysis when no API key is set', async () => {
+      process.env.GEMINI_API_KEY = '';
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('gemini_api_key');
+      }
+
+      const deckCards = [
+        { name: 'Ashnod\'s Altar', typeLine: 'Artifact' },
+        { name: 'Nim Deathmantle', typeLine: 'Artifact — Equipment' }
+      ];
+      const collectionCards = [
+        { name: 'Grave Titan', typeLine: 'Creature — Giant' }
+      ];
+
+      const result = await analyzeDeckWithAI('Meren of Clan Nel Toth', deckCards, collectionCards);
+      expect(result.deckSummary).toContain('Meren of Clan Nel Toth');
+      expect(result.dynamicCombos.length).toBeGreaterThan(0);
+      expect(result.collectionUpgrades.length).toBe(1);
+      expect(result.collectionUpgrades[0].cardName).toBe('Grave Titan');
+      expect(result.pilotingSecrets.length).toBeGreaterThan(0);
+      expect(mockGenerateContent).not.toHaveBeenCalled();
+    });
+
+    it('returns parsed AI analysis when API call succeeds', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      const mockAnalysis = {
+        deckSummary: 'High-power Golgari aristocrats deck with dense recursion.',
+        dynamicCombos: [
+          {
+            name: 'Nim Deathmantle + Ashnod\'s Altar + Grave Titan',
+            cards: ['Nim Deathmantle', 'Ashnod\'s Altar', 'Grave Titan'],
+            isInfinite: true,
+            result: 'Infinite colorless mana and 2/2 Zombie tokens',
+            prerequisites: ['All 3 pieces on board or ready to cast'],
+            steps: ['Sac Titan + 1 token', 'Pay 4 for Deathmantle trigger', 'Titan enters creating 2 tokens'],
+            disruptionWindow: 'Instant removal on Deathmantle or graveyard exile in response to trigger'
+          }
+        ],
+        collectionUpgrades: [
+          {
+            cardName: 'Viscera Seer',
+            synergyReason: 'Zero-mana free sacrifice outlet owned in your collection.',
+            role: 'engine'
+          }
+        ],
+        pilotingSecrets: [
+          {
+            title: 'Sandbagging Grave Titan',
+            tip: 'Hold Grave Titan in hand until after opponents commit board wipes.',
+            applicableCards: ['Grave Titan']
+          }
+        ]
+      };
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockAnalysis) });
+
+      const result = await analyzeDeckWithAI('Meren of Clan Nel Toth', [{ name: 'Grave Titan' }]);
+      expect(result.dynamicCombos.length).toBe(1);
+      expect(result.dynamicCombos[0].isInfinite).toBe(true);
+      expect(result.collectionUpgrades[0].cardName).toBe('Viscera Seer');
+    });
+
+    it('handles AI analysis error gracefully', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      mockGenerateContent.mockRejectedValueOnce(new Error('Rate limit'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await analyzeDeckWithAI('Meren', []);
+      expect(result.dynamicCombos).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('analyzeMarketWithAI', () => {
+    it('returns offline market analysis when no API key is provided', async () => {
+      process.env.GEMINI_API_KEY = '';
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('gemini_api_key');
+      }
+
+      const cards = [
+        { name: 'Underground Sea', currentPriceUsd: 750, isReserved: true },
+        { name: 'Smothering Tithe', currentPriceUsd: 25, isReserved: false },
+        { name: 'Sol Ring', currentPriceUsd: 1.5, isReserved: false }
+      ];
+
+      const result = await analyzeMarketWithAI(cards);
+      expect(result.overallMarketVerdict).toContain('Portfolio contains');
+      expect(result.sellRecommendations.some((c) => c.cardName === 'Smothering Tithe')).toBe(true);
+      expect(result.safeHavenHoldings.some((c) => c.cardName === 'Underground Sea')).toBe(true);
+      expect(mockGenerateContent).not.toHaveBeenCalled();
+    });
+
+    it('returns parsed AI market analysis when API call succeeds', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      const mockMarketResult = {
+        overallMarketVerdict: 'Strong portfolio with $400 in vulnerable reprint targets.',
+        portfolioHealthAssessment: 'Moderate risk — swap non-reserved cards to capture value.',
+        sellRecommendations: [
+          {
+            cardName: 'Smothering Tithe',
+            currentPriceUsd: 25,
+            urgency: 'Upcoming Cycle',
+            reasonToSell: 'Frequent commander precon target; sell into peak demand before next reprint.',
+            projectedReprintWindow: 'Q3 Commander Legends product',
+            budgetSwap: 'Monologue Tax',
+            estimatedSavings: 22
+          }
+        ],
+        safeHavenHoldings: [
+          {
+            cardName: 'Gaea\'s Cradle',
+            currentPriceUsd: 850,
+            reasonToHold: 'Reserved list staple with zero reprint risk under WotC policy.'
+          }
+        ]
+      };
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockMarketResult) });
+
+      const result = await analyzeMarketWithAI([{ name: 'Smothering Tithe', currentPriceUsd: 25 }]);
+      expect(result.sellRecommendations[0].budgetSwap).toBe('Monologue Tax');
+      expect(result.safeHavenHoldings[0].cardName).toBe("Gaea's Cradle");
+    });
+
+    it('handles AI market analysis error gracefully', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      mockGenerateContent.mockRejectedValueOnce(new Error('Network error'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await analyzeMarketWithAI([]);
+      expect(result.sellRecommendations).toEqual([]);
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     });

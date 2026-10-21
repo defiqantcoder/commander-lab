@@ -1,16 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, ArrowDownWideNarrow, BookOpen, Check, ChevronDown, ChevronRight, CircleDollarSign, Coins, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Plus, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
+  import { Activity, ArrowDownWideNarrow, BookOpen, BrainCircuit, Check, ChevronDown, ChevronRight, CircleDollarSign, Coins, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Plus, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
   import { getAllDecks, getDeck, saveDeck, getCollection, type CollectionCard } from '$lib/db';
   import CardGrid from './CardGrid.svelte';
   import CardDetailModal from './CardDetailModal.svelte';
   import ApiKeyModal from './ApiKeyModal.svelte';
+  import AIDeckArchitectModal from './AIDeckArchitectModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
   import MatchupArena from './MatchupArena.svelte';
   import PilotGuide from './PilotGuide.svelte';
   import MarketAdvisor from './MarketAdvisor.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
-  import { getGeminiApiKey } from '$lib/ai/gemini';
+  import { getGeminiApiKey, type GeneratedDeckResult } from '$lib/ai/gemini';
   import { autocompleteCardName, getCardByName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
   import { auditDeckSaltAndPower, classifyCardRole, generateSynergyGraph, type CardSynergyInput, type SaltScoreAudit, type SynergyGraphData } from '$lib/engine/synergy';
   import { detectDynamicSynergyPlays } from '$lib/engine/playbook';
@@ -243,6 +244,7 @@
   let deckValue = $derived(cards.reduce((sum, card) => sum + (card.currentPriceUsd ?? 0) * card.quantity, 0));
 
   let showApiKeyModal = $state(false);
+  let showAIArchitectModal = $state(false);
   let hasApiKey = $state(false);
 
   onMount(async () => {
@@ -629,6 +631,50 @@
     saveStatus = `Swapped ${originalCardName} for ${replacementCardName}`;
   }
 
+  async function applyAIGeneratedDeck(generated: GeneratedDeckResult): Promise<void> {
+    deck.archetype = generated.archetype;
+    deck.saltScore = generated.estimatedSaltScore;
+    if (commander.name) {
+      deck.name = `${commander.name} — ${generated.archetype}`;
+    }
+
+    const loadedCards: DeckCard[] = [];
+    for (const item of generated.cards) {
+      try {
+        const scryfallCard = await getCardByName(item.name);
+        if (scryfallCard) {
+          const dc = toDeckCard(scryfallCard);
+          dc.role = item.category as CardRole;
+          dc.synergyNotes = item.synergyRationale;
+          dc.budgetReplacement = item.budgetAlternative;
+          loadedCards.push(dc);
+          continue;
+        }
+      } catch {
+        // Fall back to generated card metadata
+      }
+
+      loadedCards.push({
+        id: `gen-${Math.random().toString(36).substring(2, 9)}`,
+        name: item.name,
+        set: 'ai',
+        collectorNumber: '1',
+        foil: false,
+        quantity: 1,
+        manaCost: '',
+        cmc: item.cmc,
+        role: item.category as CardRole,
+        typeLine: item.category === 'land' ? 'Land' : 'Spell',
+        synergyNotes: item.synergyRationale,
+        budgetReplacement: item.budgetAlternative
+      });
+    }
+
+    cards = loadedCards;
+    saveStatus = `AI generated ${loadedCards.length} cards for ${generated.archetype}`;
+    await persistDeck();
+  }
+
   let showIOModal = $state(false);
   let ioMode = $state<'export' | 'import'>('export');
   let importText = $state('');
@@ -721,6 +767,10 @@
   <div class="workspace-heading enter">
     <div><div class="breadcrumb"><span>DECKS</span><ChevronRight size={12} /><span class="current-crumb">{deck.name}</span><i></i><span class="saved-label">{saveStatus}</span></div><h1><input class="deck-name-input" bind:value={deck.name} aria-label="Deck name" /><small>v.04</small></h1><div class="heading-meta"><span class="commander-label"><i></i>{commander.name}</span><b></b><span>{deck.archetype}</span><b></b><span>Updated just now</span></div></div>
     <div class="heading-actions">
+      <button class="subtle-button ai-architect-btn" onclick={() => showAIArchitectModal = true} title="AI Deck Architect (Google Gemini)">
+        <BrainCircuit size={13} />
+        <span>AI Architect</span>
+      </button>
       <button class="subtle-button key-button" onclick={() => showApiKeyModal = true} title="Configure Google Gemini API Key" aria-label="Configure Google Gemini API Key">
         <Key size={13} />
         <span>Gemini Key</span>
@@ -755,7 +805,7 @@
   </nav>
 
   {#if activeView === 'playbook'}
-    <div class="single-view enter"><PilotGuide {cards} {commander} deckName={deck.name} archetype={deck.archetype} /></div>
+    <div class="single-view enter"><PilotGuide {cards} {commander} deckName={deck.name} archetype={deck.archetype} onApplyAddition={applyArenaAddition} /></div>
   {:else if activeView === 'goldfish'}
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
   {:else if activeView === 'matchup'}
@@ -935,6 +985,14 @@
     hasApiKey = !!getGeminiApiKey();
   }}
   onkeychange={(k) => (hasApiKey = k)}
+/>
+
+<AIDeckArchitectModal
+  open={showAIArchitectModal}
+  {commander}
+  {userCollection}
+  onclose={() => showAIArchitectModal = false}
+  onApplyDeck={applyAIGeneratedDeck}
 />
 
 <style>

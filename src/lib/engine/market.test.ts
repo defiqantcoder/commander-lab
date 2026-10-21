@@ -14,6 +14,11 @@ describe('Market & Liquidation Intelligence Engine', () => {
       expect(calculateCardReprintRisk('Underground Sea', 750)).toBe(0);
       expect(calculateCardReprintRisk('Mox Diamond', 650)).toBe(0);
       expect(calculateCardReprintRisk('Sliver Queen', 250)).toBe(0);
+      expect(calculateCardReprintRisk('Gilded Drake', 280)).toBe(0);
+      expect(calculateCardReprintRisk('Intuition', 140)).toBe(0);
+      expect(calculateCardReprintRisk('Time Spiral', 120)).toBe(0);
+      expect(calculateCardReprintRisk("Mishra's Workshop", 2500)).toBe(0);
+      expect(calculateCardReprintRisk('Bazaar of Baghdad', 2000)).toBe(0);
     });
 
     it('returns low risk score for sub-$2 cards and basic lands', () => {
