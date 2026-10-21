@@ -52,41 +52,8 @@ Commander Lab is a zero-cost, local-first Progressive Web App (PWA) engineered s
    - Compiles 2 to 3 complete 100-card decklists with card art, role tags (ramp, draw, engine, interaction, payoff), and mana curve balancing.
 5. **Market Timing & Liquidation Advisor:**
    - Scans personal collection cards against live market trends and reprint risk windows to pinpoint optimal exit/liquidation opportunities.
-6. **Turn 1–5 Goldfish Simu- **[x] Task A1:** Review, test, and merge all Jules PRs (#1 through #26) into `main`. *(Completed)*
-- **[x] Task A2:** Add Dexie offline mock tests and verify browser storage edge cases. *(Completed)*
-- **[x] Task A3:** Maintain green test suite across all engine and API contracts (42/42 tests passing). *(Completed)*
-
----
-
-### Antigravity Track (Data, Engine & Logic)
-- **Domain:** `src/lib/engine/`, `src/lib/db/`, `src/lib/api/`, test suites
-- [x] **Scryfall Cache & Dexie Store**: Ingestion schema, rate limiter, IndexedDB persistence (with offline Dexie unit tests).
-- [x] **Commander Validator**: 100-card color identity, singleton check, banlist verification.
-- [x] **Synergy Engine**: Scoring algorithm and local prompt pipeline for deck evaluation.
-- [x] **Goldfish Simulator Core**: Turn-based state machine for hand draws and mana curves.
-- [x] **Matchup Sparring Engine**: Automated play-testing vs EDHREC benchmarks with AI coaching & cut suggestions.
-
----
-
-### Copilot Track (UI, Components & Layouts)
-- **Domain:** `src/routes/`, `src/lib/components/`, `src/app.css`
-- [x] **Main Dashboard Shell**: SvelteKit responsive layouts and workspace grid (`DeckStudio.svelte`).
-- [x] **Deck List & Card Modals**: Visual card view, mana cost pips, category sorting, arrow-key card navigation (`CardDetailModal.svelte`).
-- [x] **Synergy Graph Component**: Visual node/flowchart display for card interactions (`SynergyGraph.svelte`).
-- [x] **Goldfish View**: Interactive play-testing dashboard and turn tracker UI (`GoldfishView.svelte`).
-- [x] **Matchup Arena UI**: Sparring against EDHREC benchmarks and saved decks with AI coaching (`MatchupArena.svelte`).
-
----
-
-## 5. Google Ecosystem & Developer Tooling Integrations
-
-- **Google Stitch 2.0 (`stitch.withgoogle.com`):** Primary design-to-code canvas to rapidly prototype, visually iterate, and export production-ready SvelteKit and Tailwind layout components.
-- **Google Jules (`jules.google` / `@google/jules-tools`):** Autonomous background GitHub coding agent for Scryfall rate-limit unit tests and documentation PRs.
-- **Google AI Studio (AI Pro Tier):** Zero-billing high-throughput API key generation, prompt prototyping, and structured JSON testing.
-- **NotebookLM:** Ingest the full 200+ page MTG Comprehensive Rules doc and tournament guides to mathematically verify replacement effects and complex priority interactions.
-- **Google Sheets API Sync:** Export collection inventory, market timing liquidation signals, and price alert history to a synced Google Sheet.
-- **Pixel 10 Pro Fold:** Multi-column studio experience when unfolded.
-- **Credential Security:** Key managed via Proton Pass vault; loaded locally via `~/.config/gemini/api_key` (`chmod 600`).lator ("Gemini Turn Advisor"):**
+6. **Turn 1–5 Goldfish Simulator ("Gemini Turn Advisor"):**
+   - In-browser testing bench simulating opening hands, mulligan decisions, curve-out lines, and turn 1–5 sequencing suggestions.
    - In-browser testing bench simulating opening hands, mulligan decisions, curve-out lines, and turn 1–5 sequencing suggestions.
 7. **Contextual Budget & Collection Swapper:**
    - Recommends hidden gems ($0.50 range) that replicate 90% of a staple's functional output.
@@ -311,3 +278,43 @@ function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[])
 - **Google Sheets API Sync:** Export collection inventory, market timing liquidation signals, and price alert history to a synced Google Sheet.
 - **Pixel 10 Pro Fold:** Multi-column studio experience when unfolded.
 - **Credential Security:** Key managed via Proton Pass vault; loaded locally via `~/.config/gemini/api_key` (`chmod 600`).
+
+---
+
+## 6. Current Status & Agent Roadmap (Session Hand-off)
+
+### Accomplished in this Sprint
+1. **Core Architectural Pillar 5 (Market Intelligence & Liquidation Advisor) Fully Implemented:**
+   - **Market Engine (`src/lib/engine/market.ts`):** Dynamic reprint risk calculation (`calculateCardReprintRisk`), portfolio exposure reporting (`analyzeDeckMarketLiquidation`), official WotC Reserved List vault immunity (`KNOWN_RESERVED_LIST`), and curated sub-$2 high-synergy budget swaps (`STAPLE_BUDGET_SWAP_REGISTRY`).
+   - **Market Unit Tests (`src/lib/engine/market.test.ts`):** 10/10 passing tests verifying risk formulas, Reserved List exemption, and savings calculations.
+   - **Market Advisor UI (`src/lib/components/MarketAdvisor.svelte`):** Complete dashboard with health score gauge, reprint risk watchlist, one-click budget swapper, Reserved List vault, and full price matrix.
+2. **Universal Decoupling & Zero Pre-Filled Clean Slate:**
+   - `DeckStudio.svelte` completely purged of hardcoded demo/test cards (`c1`–`c14`).
+   - Starts with a clean empty slate (`cards = []`, prompt to search cards or select commander).
+   - Dynamic mana curve and average CMC calculated in real time from non-land cards.
+   - Dynamic health metrics and deck health score derived from actual card roles.
+   - Dexie collection table connected to the studio (`userCollection`) to track cards owned in collection.
+   - Saved decks list supports switching between user decks, with a "+ New" button to create an empty deck at any time.
+   - Graceful empty states added to CardGrid, Goldfish Bench, Matchup Arena, Pilot Guide, and Market Advisor.
+3. **PR Merges & CI/CD:**
+   - Jules's PR #27 (stress tests for universal playbook engine) merged into `main`. Full test suite now at **80 / 80 passing tests** across 11 test suites.
+   - Created GitHub Actions CI workflow (`.github/workflows/ci.yml`).
+   - All changes committed and pushed to `origin/main` (`789ed9f`).
+
+---
+
+### Jules Background Task Assignment (Ready for Submission)
+
+**Task Title:** Add Unit Tests for Market Engine Edge Cases & Dexie Collection Sync (`src/lib/engine/market-stress.test.ts`)
+
+**Task Description:**
+```text
+Write offline Vitest stress tests in `src/lib/engine/market-stress.test.ts` for the Market Intelligence & Liquidation Engine (`src/lib/engine/market.ts`):
+1. Test extreme card price boundaries ($0.00 basic lands, $0.05 bulk commons, $1.99 budget threshold, $10,000+ power nine cards).
+2. Test Reserved List variations (case-insensitivity, apostrophes like "Gaea's Cradle" vs "Gaeas Cradle", dual lands, drop of honey).
+3. Test portfolio liquidation calculations on decks with 0 cards, 100% budget cards, 100% Reserved List cards, and 100% reprint-vulnerable cards.
+4. Verify calculateCardReprintRisk correctly handles foil status (+10 score) and basic land type lines.
+5. Do NOT edit any UI components or make any outbound network calls (mock or use local fixtures only).
+6. Ensure `npm test` passes cleanly.
+```
+
