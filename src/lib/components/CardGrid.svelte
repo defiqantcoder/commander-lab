@@ -1,6 +1,7 @@
 <script lang="ts">
   import CardRow from './CardRow.svelte';
   import { manaSymbols, type DeckCard } from './types';
+  import { Sparkles } from 'lucide-svelte';
 
   export let cards: DeckCard[] = [];
   export let onselect: (card: DeckCard) => void = () => {};
@@ -32,7 +33,11 @@
     {/each}
   {/if}
   {#if cards.length === 0}
-    <div class="empty-state">No cards match these filters.</div>
+    <div class="empty-state">
+      <Sparkles size={24} class="empty-sparkle" />
+      <p class="empty-title">Deck is currently empty</p>
+      <p class="empty-subtitle">Search cards above from Scryfall, or click <strong>Decklist I/O</strong> to import your list from clipboard.</p>
+    </div>
   {/if}
 </div>
 
@@ -66,7 +71,11 @@
   .list-header span:nth-child(3) { grid-column: 3; }
   .list-header span:nth-child(4) { grid-column: 4; }
   .list-header span:nth-child(5) { grid-column: 5; text-align: right; }
-  .empty-state { padding: 34px 15px; color: #71717a; font-size: 12px; text-align: center; }
+  .empty-state { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 16px; border: 1px dashed #2b2b30; border-radius: 8px; background: rgba(20, 20, 23, 0.4); text-align: center; gap: 8px; }
+  .empty-state :global(.empty-sparkle) { color: #38bdf8; }
+  .empty-title { margin: 0; color: #e4e4e7; font-size: 13px; font-weight: 600; }
+  .empty-subtitle { margin: 0; color: #71717a; font-size: 10px; max-width: 320px; line-height: 1.4; }
+  .empty-subtitle strong { color: #38bdf8; font-weight: 600; }
   @media (max-width: 1100px) { .card-list:not(.list-mode) { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
   @media (max-width: 760px) { .card-list:not(.list-mode) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; padding: 9px; } .card-info { padding: 7px; } .card-heading strong { font-size: 9px; } }
   @media (max-width: 420px) { .card-list:not(.list-mode) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

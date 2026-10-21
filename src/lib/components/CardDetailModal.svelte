@@ -42,12 +42,14 @@
         {/if}
         <section class="note-block">
           <div class="block-title"><Sparkles size={14} /> Synergy note</div>
-          <p>{card.synergyNotes ?? 'Supports the deck’s core plan by adding another layer of value to the counter and proliferate engine.'}</p>
+          <p>{card.synergyNotes ?? 'Advances your deck’s gameplan through role-aligned synergy and board presence.'}</p>
         </section>
-        <section class="replacement-block">
-          <div class="block-title"><ArrowDownRight size={14} /> Budget alternative</div>
-          <div class="replacement-line"><strong>{card.budgetReplacement ?? 'Evolution Sage'}</strong><span>Similar role · lower market price</span></div>
-        </section>
+        {#if card.budgetReplacement}
+          <section class="replacement-block">
+            <div class="block-title"><ArrowDownRight size={14} /> Budget alternative</div>
+            <div class="replacement-line"><strong>{card.budgetReplacement}</strong><span>Similar role · lower market price</span></div>
+          </section>
+        {/if}
         <div class="footer-row">
           <a class="scryfall-link" href={`https://scryfall.com/search?q=${encodeURIComponent(card.name)}`} target="_blank" rel="noreferrer">Open on Scryfall <ExternalLink size={13} /></a>
           <div class="keyboard-hints" aria-label="Keyboard shortcuts">

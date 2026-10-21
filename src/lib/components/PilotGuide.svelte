@@ -76,6 +76,13 @@
   }
 </script>
 
+{#if !commander.name && cards.length === 0}
+  <div class="empty-playbook panel">
+    <BookOpen size={32} class="empty-icon text-sky" />
+    <h3>Piloting Playbook</h3>
+    <p>Select a Commander or add cards to your deck in the Studio to automatically generate tactical phase-by-phase piloting instructions, combo lines, and recovery guides.</p>
+  </div>
+{:else}
 <div class="playbook-container panel enter">
   <header class="playbook-header">
     <div class="header-main">
@@ -422,8 +429,13 @@
     {/if}
   </div>
 </div>
+{/if}
 
 <style>
+  .empty-playbook { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; gap: 10px; border: 1px dashed #2b2b30; border-radius: 8px; background: rgba(20, 20, 23, 0.4); margin: 20px auto; max-width: 580px; }
+  .empty-playbook :global(.empty-icon) { color: #38bdf8; }
+  .empty-playbook h3 { margin: 0; color: #f4f4f5; font-size: 16px; font-weight: 600; }
+  .empty-playbook p { margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.5; max-width: 440px; }
   .playbook-container { width: min(940px, 100%); margin: 16px auto 0; overflow: hidden; border: 1px solid #2b2b31; background: #111114; }
   .playbook-header { padding: 18px 22px; border-bottom: 1px solid #232328; background: linear-gradient(180deg, #18181d 0%, #111114 100%); }
   .badge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }

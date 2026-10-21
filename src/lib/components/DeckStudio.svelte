@@ -1,13 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, ArrowDownWideNarrow, BookOpen, Check, ChevronDown, ChevronRight, CircleDollarSign, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
-  import { getAllDecks, getDeck, saveDeck } from '$lib/db';
+  import { Activity, ArrowDownWideNarrow, BookOpen, Check, ChevronDown, ChevronRight, CircleDollarSign, Coins, Copy, Download, FileText, Filter, Grid2X2, Key, Layers3, List, PanelLeftClose, PanelRightClose, Plus, Search, Shield, Sparkles, Swords, Target, TrendingUp, Upload, WandSparkles, X } from 'lucide-svelte';
+  import { getAllDecks, getDeck, saveDeck, getCollection, type CollectionCard } from '$lib/db';
   import CardGrid from './CardGrid.svelte';
   import CardDetailModal from './CardDetailModal.svelte';
   import ApiKeyModal from './ApiKeyModal.svelte';
   import GoldfishView from './GoldfishView.svelte';
   import MatchupArena from './MatchupArena.svelte';
   import PilotGuide from './PilotGuide.svelte';
+  import MarketAdvisor from './MarketAdvisor.svelte';
   import SynergyGraph from './SynergyGraph.svelte';
   import { getGeminiApiKey } from '$lib/ai/gemini';
   import { autocompleteCardName, getCardByName, searchCards as searchScryfallCards, type ScryfallCard } from '$lib/api/scryfall';
@@ -16,44 +17,196 @@
   import { manaSymbols, type CardRole, type DeckCard, type SavedDeck } from './types';
 
   const roles: CardRole[] = ['ramp', 'draw', 'engine', 'interaction', 'payoff', 'land'];
-  let deck = $state<SavedDeck>({ id: 'deck-atraxa-proliferate', name: 'The Long Game', commanderId: 'atraxa-praetors-voice', commanderName: 'Atraxa, Praetors’ Voice', archetype: 'Proliferate / Counters', saltScore: 3.4, cards: [], updatedAt: new Date('2026-10-18T12:00:00') });
+  let deck = $state<SavedDeck>({
+    id: 'deck-draft',
+    name: 'Untitled Deck',
+    commanderId: '',
+    commanderName: '',
+    archetype: 'Custom Deck',
+    saltScore: 0,
+    cards: [],
+    updatedAt: new Date()
+  });
   let commander = $state<DeckCard>({
-    id: 'commander-atraxa',
-    name: 'Atraxa, Praetors’ Voice',
-    set: '2x2',
-    collectorNumber: '190',
+    id: '',
+    name: '',
+    set: '',
+    collectorNumber: '',
     foil: false,
     quantity: 1,
-    currentPriceUsd: 17.42,
-    manaCost: '{3}{W}{U}{B}{G}',
-    cmc: 4,
+    currentPriceUsd: 0,
+    manaCost: '',
+    cmc: 0,
     role: 'commander',
-    typeLine: 'Legendary Creature — Phyrexian Angel Horror',
-    oracleText: 'Flying, vigilance, deathtouch, lifelink. At the beginning of your end step, proliferate.',
-    colorIdentity: ['W', 'U', 'B', 'G'],
-    imageUris: {
-      art_crop: 'https://api.scryfall.com/cards/named?exact=Atraxa%2C%20Praetors%E2%80%99%20Voice&format=image&version=art_crop',
-      normal: 'https://api.scryfall.com/cards/named?exact=Atraxa%2C%20Praetors%E2%80%99%20Voice&format=image&version=normal'
-    }
+    typeLine: 'Legendary Creature',
+    oracleText: '',
+    colorIdentity: []
   });
-  let cards = $state<DeckCard[]>([
-    { id: 'c1', name: 'Hardened Scales', set: 'ktk', collectorNumber: '133', foil: false, quantity: 1, currentPriceUsd: 7.82, manaCost: '{G}', cmc: 1, role: 'engine', typeLine: 'Enchantment', synergyNotes: 'Adds an extra counter to each counter-placement event, compounding every proliferate trigger.', budgetReplacement: 'Conclave Mentor' },
-    { id: 'c2', name: 'Evolution Sage', set: 'war', collectorNumber: '159', foil: true, quantity: 1, currentPriceUsd: 1.34, manaCost: '{2}{G}', cmc: 3, role: 'engine', typeLine: 'Creature — Elf Druid', oracleText: 'Landfall — Whenever a land enters the battlefield under your control, proliferate.', synergyNotes: 'Turns each land drop into a proliferate trigger, making fetch lands especially valuable.' },
-    { id: 'c3', name: 'Sol Ring', set: 'cmm', collectorNumber: '396', foil: false, quantity: 1, currentPriceUsd: 1.89, manaCost: '{1}', cmc: 1, role: 'ramp', typeLine: 'Artifact', synergyNotes: 'Accelerates the commander and early engine pieces by a full turn.' },
-    { id: 'c4', name: 'Deepglow Skate', set: 'cmm', collectorNumber: '91', foil: false, quantity: 1, currentPriceUsd: 2.49, manaCost: '{4}{U}', cmc: 5, role: 'payoff', typeLine: 'Creature — Fish', synergyNotes: 'Doubles every kind of counter on permanents, often converting a developed board into immediate pressure.' },
-    { id: 'c5', name: 'Arcane Signet', set: 'moc', collectorNumber: '357', foil: false, quantity: 1, currentPriceUsd: 0.62, manaCost: '{2}', cmc: 2, role: 'ramp', typeLine: 'Artifact', synergyNotes: 'Fixes all four colors for an early Atraxa.' },
-    { id: 'c6', name: 'Tezzeret’s Gambit', set: 'nph', collectorNumber: '38', foil: false, quantity: 1, currentPriceUsd: 0.73, manaCost: '{3}{U/P}{U/P}', cmc: 4, role: 'draw', typeLine: 'Sorcery', synergyNotes: 'Cards plus proliferate in a single slot; life payment keeps it castable when colors are tight.' },
-    { id: 'c7', name: 'Swords to Plowshares', set: 'cmm', collectorNumber: '68', foil: false, quantity: 1, currentPriceUsd: 1.21, manaCost: '{W}', cmc: 1, role: 'interaction', typeLine: 'Instant', synergyNotes: 'Efficient answer to a creature threatening the engine or the table.' },
-    { id: 'c8', name: 'The Ozolith', set: 'iko', collectorNumber: '237', foil: false, quantity: 1, currentPriceUsd: 12.64, manaCost: '{1}', cmc: 1, role: 'engine', typeLine: 'Legendary Artifact', synergyNotes: 'Preserves accumulated counters through removal and moves them to an evasive threat.', budgetReplacement: 'Resourceful Defense' },
-    { id: 'c9', name: 'Cultivate', set: 'm21', collectorNumber: '177', foil: false, quantity: 1, currentPriceUsd: 0.31, manaCost: '{2}{G}', cmc: 3, role: 'ramp', typeLine: 'Sorcery', synergyNotes: 'Guarantees land drops while fixing colors for the four-color curve.' },
-    { id: 'c10', name: 'Inexorable Tide', set: 'som', collectorNumber: '35', foil: false, quantity: 1, currentPriceUsd: 5.77, manaCost: '{3}{U}{U}', cmc: 5, role: 'engine', typeLine: 'Enchantment', synergyNotes: 'Adds proliferate to every noncreature spell, scaling with cheap interaction.' },
-    { id: 'c11', name: 'Beast Within', set: 'cmm', collectorNumber: '273', foil: false, quantity: 1, currentPriceUsd: 0.39, manaCost: '{2}{G}', cmc: 3, role: 'interaction', typeLine: 'Instant', synergyNotes: 'Flexible permanent removal that can answer difficult pieces.' },
-    { id: 'c12', name: 'Nissa, Voice of Zendikar', set: 'ogw', collectorNumber: '138', foil: false, quantity: 1, currentPriceUsd: 1.16, manaCost: '{1}{G}{G}', cmc: 3, role: 'payoff', typeLine: 'Legendary Planeswalker — Nissa', synergyNotes: 'Makes counter-bearing bodies, then proliferate grows both the board and loyalty.' },
-    { id: 'c13', name: 'Esper Sentinel', set: 'mh2', collectorNumber: '12', foil: false, quantity: 1, currentPriceUsd: 22.16, manaCost: '{W}', cmc: 1, role: 'draw', typeLine: 'Artifact Creature — Human Soldier', synergyNotes: 'Early draw engine that rewards low-cost setup.' },
-    { id: 'c14', name: 'Command Tower', set: 'clb', collectorNumber: '278', foil: false, quantity: 1, currentPriceUsd: 0.28, manaCost: '', cmc: 0, role: 'land', typeLine: 'Land', synergyNotes: 'Untapped four-color fixing with no deckbuilding cost.' }
+  let cards = $state<DeckCard[]>([]);
+  let userCollection = $state<CollectionCard[]>([]);
+  let graphCards = $derived(commander.name ? [commander, ...cards] : [...cards]);
+
+  let nonLandCards = $derived(cards.filter((c) => c.role !== 'land'));
+  let averageCmc = $derived(
+    nonLandCards.length > 0
+      ? (nonLandCards.reduce((sum, c) => sum + (c.cmc || 0), 0) / nonLandCards.length).toFixed(2)
+      : '0.00'
+  );
+  let dynamicCurve = $derived(() => {
+    const buckets = [
+      { label: '0', count: 0 },
+      { label: '1', count: 0 },
+      { label: '2', count: 0 },
+      { label: '3', count: 0 },
+      { label: '4', count: 0 },
+      { label: '5', count: 0 },
+      { label: '6+', count: 0 }
+    ];
+    for (const c of nonLandCards) {
+      const cmc = Math.floor(c.cmc || 0);
+      if (cmc <= 0) buckets[0].count++;
+      else if (cmc === 1) buckets[1].count++;
+      else if (cmc === 2) buckets[2].count++;
+      else if (cmc === 3) buckets[3].count++;
+      else if (cmc === 4) buckets[4].count++;
+      else if (cmc === 5) buckets[5].count++;
+      else buckets[6].count++;
+    }
+    const maxCount = Math.max(1, ...buckets.map((b) => b.count));
+    return buckets.map((b) => ({
+      label: b.label,
+      count: b.count,
+      height: Math.round((b.count / maxCount) * 100)
+    }));
+  });
+
+  let landCount = $derived(cards.filter((c) => c.role === 'land' || /land/i.test(c.typeLine || '')).length);
+  let rampCount = $derived(cards.filter((c) => c.role === 'ramp').length);
+  let drawCount = $derived(cards.filter((c) => c.role === 'draw').length);
+  let interactionCount = $derived(cards.filter((c) => c.role === 'interaction').length);
+
+  let dynamicHealthMetrics = $derived([
+    { name: 'Land count', value: String(landCount), range: '/ 36–38', width: `${Math.min(100, Math.round((landCount / 37) * 100))}%` },
+    { name: 'Ramp sources', value: String(rampCount), range: '/ 10–12', width: `${Math.min(100, Math.round((rampCount / 11) * 100))}%` },
+    { name: 'Card advantage', value: String(drawCount), range: '/ 10–12', width: `${Math.min(100, Math.round((drawCount / 10) * 100))}%` },
+    { name: 'Interaction', value: String(interactionCount), range: '/ 8–12', width: `${Math.min(100, Math.round((interactionCount / 10) * 100))}%` }
   ]);
-  let graphCards = $derived([commander, ...cards]);
-  const curve = [{ label: '0', count: 8, height: 29 }, { label: '1', count: 13, height: 46 }, { label: '2', count: 18, height: 64 }, { label: '3', count: 19, height: 70 }, { label: '4', count: 15, height: 55 }, { label: '5', count: 10, height: 37 }, { label: '6+', count: 5, height: 22 }];
+
+  let deckHealthScore = $derived(() => {
+    if (cards.length === 0) return 0;
+    let score = 50;
+    if (landCount >= 34 && landCount <= 40) score += 15;
+    if (rampCount >= 8 && rampCount <= 14) score += 15;
+    if (drawCount >= 8 && drawCount <= 14) score += 10;
+    if (interactionCount >= 6 && interactionCount <= 14) score += 10;
+    return Math.min(100, score);
+  });
+
+  let ownedInCollectionCount = $derived(() => {
+    if (cards.length === 0) return 0;
+    const collectionNames = new Set(userCollection.map((c) => c.name.toLowerCase().trim()));
+    return cards.filter((c) => collectionNames.has(c.name.toLowerCase().trim())).length;
+  });
+
+  function initEmptyDeck(): void {
+    deck = {
+      id: `deck-${Date.now()}`,
+      name: 'New Custom Deck',
+      commanderId: '',
+      commanderName: '',
+      archetype: 'Custom Deck',
+      saltScore: 0,
+      cards: [],
+      updatedAt: new Date()
+    };
+    commander = {
+      id: '',
+      name: '',
+      set: '',
+      collectorNumber: '',
+      foil: false,
+      quantity: 1,
+      currentPriceUsd: 0,
+      manaCost: '',
+      cmc: 0,
+      role: 'commander',
+      typeLine: 'Legendary Creature',
+      oracleText: '',
+      colorIdentity: []
+    };
+    cards = [];
+    lastSavedFingerprint = '';
+    saveStatus = 'New empty deck created';
+  }
+
+  async function loadSavedDeck(storedDeck: SavedDeck): Promise<void> {
+    deck = storedDeck;
+    cards = storedDeck.cards.filter((entry) => entry.category !== 'commander').map(toDeckCardEntry);
+    const commanderEntry = storedDeck.cards.find((entry) => entry.category === 'commander');
+    if (commanderEntry) {
+      commander = {
+        id: commanderEntry.id,
+        name: commanderEntry.name,
+        set: '',
+        collectorNumber: '',
+        foil: false,
+        quantity: 1,
+        currentPriceUsd: 0,
+        manaCost: commanderEntry.manaCost ?? '',
+        cmc: commanderEntry.cmc ?? 0,
+        role: 'commander',
+        typeLine: commanderEntry.typeLine ?? 'Legendary Creature',
+        oracleText: '',
+        imageUris: commanderEntry.imageUris,
+        colorIdentity: commanderEntry.colorIdentity ?? []
+      };
+      if (!commanderEntry.imageUris?.art_crop || !commanderEntry.colorIdentity?.length) {
+        getCardByName(commanderEntry.name).then((sc) => {
+          if (sc && commander.name === commanderEntry.name) {
+            applyScryfallToCommander(sc);
+          }
+        }).catch(() => {});
+      }
+    } else if (storedDeck.commanderName) {
+      commander = {
+        id: storedDeck.commanderId || `cmd-${Date.now()}`,
+        name: storedDeck.commanderName,
+        set: '',
+        collectorNumber: '',
+        foil: false,
+        quantity: 1,
+        currentPriceUsd: 0,
+        manaCost: '',
+        cmc: 0,
+        role: 'commander',
+        typeLine: 'Legendary Creature',
+        oracleText: '',
+        colorIdentity: []
+      };
+      getCardByName(storedDeck.commanderName).then((sc) => {
+        if (sc && deck.commanderName === storedDeck.commanderName) {
+          applyScryfallToCommander(sc);
+        }
+      }).catch(() => {});
+    } else {
+      commander = {
+        id: '',
+        name: '',
+        set: '',
+        collectorNumber: '',
+        foil: false,
+        quantity: 1,
+        currentPriceUsd: 0,
+        manaCost: '',
+        cmc: 0,
+        role: 'commander',
+        typeLine: 'Legendary Creature',
+        oracleText: '',
+        colorIdentity: []
+      };
+    }
+    saveStatus = `Loaded ${storedDeck.name}`;
+  }
 
   let activeRole = $state<CardRole | 'all'>('all');
   let sortBy = $state('name');
@@ -77,7 +230,7 @@
   let selectedCard = $state<DeckCard | null>(null);
   let leftOpen = $state(true);
   let rightOpen = $state(true);
-  let activeView = $state<'studio' | 'engines' | 'goldfish' | 'matchup' | 'playbook'>('studio');
+  let activeView = $state<'studio' | 'engines' | 'goldfish' | 'matchup' | 'playbook' | 'market'>('studio');
   let dynamicSynergyPlays = $derived(detectDynamicSynergyPlays(cards.map(c => ({ id: c.id, name: c.name, typeLine: c.typeLine, cmc: c.cmc, manaCost: c.manaCost, oracleText: c.oracleText, category: c.role })), { id: commander.id, name: commander.name, typeLine: commander.typeLine, cmc: commander.cmc, manaCost: commander.manaCost, oracleText: commander.oracleText, category: 'commander', isCommander: true }));
   let isChangingCommander = $state(false);
   let commanderQuery = $state('');
@@ -96,41 +249,12 @@
     hasApiKey = !!getGeminiApiKey();
     try {
       savedDecks = await getAllDecks();
-      const storedDeck = await getDeck(deck.id);
-      if (storedDeck) {
-        deck = storedDeck;
-        cards = storedDeck.cards.filter((entry) => entry.category !== 'commander').map(toDeckCardEntry);
-        const commanderEntry = storedDeck.cards.find((entry) => entry.category === 'commander');
-        if (commanderEntry) {
-          commander = {
-            id: commanderEntry.id,
-            name: commanderEntry.name,
-            set: '',
-            collectorNumber: '',
-            foil: false,
-            quantity: 1,
-            manaCost: commanderEntry.manaCost ?? '',
-            cmc: commanderEntry.cmc ?? 0,
-            role: 'commander',
-            typeLine: commanderEntry.typeLine ?? 'Legendary Creature',
-            oracleText: '',
-            imageUris: commanderEntry.imageUris,
-            colorIdentity: commanderEntry.colorIdentity ?? []
-          };
-          if (!commanderEntry.imageUris?.art_crop || !commanderEntry.colorIdentity?.length) {
-            getCardByName(commanderEntry.name).then((sc) => {
-              if (sc && commander.name === commanderEntry.name) {
-                applyScryfallToCommander(sc);
-              }
-            }).catch(() => {});
-          }
-        } else if (storedDeck.commanderName) {
-          getCardByName(storedDeck.commanderName).then((sc) => {
-            if (sc && deck.commanderName === storedDeck.commanderName) {
-              applyScryfallToCommander(sc);
-            }
-          }).catch(() => {});
-        }
+      userCollection = await getCollection();
+      if (savedDecks.length > 0) {
+        const sorted = [...savedDecks].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        await loadSavedDeck(sorted[0]);
+      } else {
+        initEmptyDeck();
       }
     } catch (error) {
       console.warn('Unable to load saved decks:', error);
@@ -499,6 +623,12 @@
     }
   }
 
+  async function applyBudgetSwap(originalCardName: string, replacementCardName: string): Promise<void> {
+    applyArenaCut(originalCardName);
+    await applyArenaAddition(replacementCardName);
+    saveStatus = `Swapped ${originalCardName} for ${replacementCardName}`;
+  }
+
   let showIOModal = $state(false);
   let ioMode = $state<'export' | 'import'>('export');
   let importText = $state('');
@@ -611,6 +741,7 @@
     <button class:active={activeView === 'playbook'} onclick={() => activeView = 'playbook'}><BookOpen size={14} /> Pilot Guide</button>
     <button class:active={activeView === 'goldfish'} onclick={() => activeView = 'goldfish'}><Swords size={14} /> Goldfish</button>
     <button class:active={activeView === 'matchup'} onclick={() => activeView = 'matchup'}><Target size={14} /> Matchup Arena</button>
+    <button class:active={activeView === 'market'} onclick={() => activeView = 'market'}><Coins size={14} /> Market Advisor</button>
     <span></span>
     <div class="identity" aria-label="Commander Color Identity">
       {#if commander.colorIdentity && commander.colorIdentity.length > 0}
@@ -629,6 +760,8 @@
     <div class="single-view enter"><GoldfishView cards={cards} {commander} /></div>
   {:else if activeView === 'matchup'}
     <div class="matchup-view enter"><MatchupArena {cards} {commander} {savedDecks} deckName={deck.name} onApplyAddition={applyArenaAddition} onApplyCut={applyArenaCut} /></div>
+  {:else if activeView === 'market'}
+    <div class="single-view enter"><MarketAdvisor {cards} {commander} deckName={deck.name} onApplySwap={applyBudgetSwap} /></div>
   {:else if activeView === 'engines'}
     <div class="engines-view enter"><section class="panel engine-panel"><div class="panel-heading"><div><span class="panel-title">{deck.archetype} feedback loop</span><small>{analyzedGraph ? `${analyzedGraph.nodes.length} nodes · ${analyzedGraph.edges.length} links` : `Generated from ${graphCards.length} cards`}</small></div><button class="subtle-button" onclick={analyzeDeck}><Sparkles size={12} /> Recalculate</button></div><SynergyGraph cards={graphCards} graphData={analyzedGraph} /></section><aside class="panel engine-notes"><div class="panel-heading"><span class="panel-title">Engine notes</span><small class="live">● LIVE</small></div>{#if deckAudit}<div class="audit-summary"><div><span>Power bracket</span><strong>{deckAudit.estimatedPowerBracket} · {deckAudit.estimatedPowerNumber}/10</strong></div><div><span>Average salt</span><strong>{deckAudit.averageSaltScore}</strong></div><div><span>Notable cards</span><strong>{deckAudit.highSaltCards.length}</strong></div></div>{/if}{#if dynamicSynergyPlays.length > 0}{#each dynamicSynergyPlays.slice(0, 3) as play, i}<div class="note"><b>0{i + 1}</b><div><strong>{play.title}</strong><p>{play.description} {play.tacticalTip}</p></div></div>{/each}{:else}<div class="note"><b>01</b><div><strong>Core Commander Synergies</strong><p>Deploy {commander.name} on curve to anchor the deck’s primary engine loop.</p></div></div><div class="note"><b>02</b><div><strong>Mana Curve Acceleration</strong><p>Prioritize 1–2 CMC ramp to accelerate into early payoffs.</p></div></div><div class="note"><b>03</b><div><strong>Interaction Timing</strong><p>Save targeted interaction for game-ending opponent combo lines.</p></div></div>{/if}</aside></div>
   {:else}
@@ -637,10 +770,22 @@
         <aside class="left-rail enter">
           <section class="panel commander-card">
             <div class="commander-art">
-              <img
-                src={commander.imageUris?.art_crop || commander.imageUris?.normal || `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(commander.name)}&format=image&version=art_crop`}
-                alt={commander.name}
-              />
+              {#if commander.name && (commander.imageUris?.art_crop || commander.imageUris?.normal)}
+                <img
+                  src={commander.imageUris?.art_crop || commander.imageUris?.normal}
+                  alt={commander.name}
+                />
+              {:else if commander.name}
+                <img
+                  src={`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(commander.name)}&format=image&version=art_crop`}
+                  alt={commander.name}
+                />
+              {:else}
+                <div class="no-commander-placeholder">
+                  <Sparkles size={24} />
+                  <span>No Commander Selected</span>
+                </div>
+              {/if}
               <span>COMMANDER</span>
               <button
                 class="change-commander-badge-btn"
@@ -651,7 +796,7 @@
                 {#if isChangingCommander}
                   <X size={11} /> Cancel
                 {:else}
-                  <Sparkles size={11} /> Switch
+                  <Sparkles size={11} /> {commander.name ? 'Switch' : 'Choose'}
                 {/if}
               </button>
             </div>
@@ -694,9 +839,9 @@
             {/if}
             <div class="commander-info">
               <div class="commander-title-row">
-                <strong>{commander.name}</strong>
+                <strong>{commander.name || 'No Commander Chosen'}</strong>
               </div>
-              <small>{commander.typeLine}</small>
+              <small>{commander.typeLine || 'Legendary Creature'}</small>
               <div class="commander-stats">
                 <span>{(commander.colorIdentity?.length ?? 0)} <small>colors</small></span>
                 <span>{commander.cmc} <small>cmc</small></span>
@@ -704,7 +849,7 @@
                   class="change-commander-link"
                   onclick={() => { isChangingCommander = !isChangingCommander; commanderQuery = ''; commanderSuggestions = []; }}
                 >
-                  {isChangingCommander ? 'Close' : 'Change Commander'}
+                  {isChangingCommander ? 'Close' : (commander.name ? 'Change Commander' : 'Select Commander')}
                 </button>
               </div>
               <div class="commander-mana">
@@ -715,22 +860,22 @@
               </div>
             </div>
           </section>
-          <section class="panel"><div class="panel-heading"><span class="panel-title">Mana curve</span><button class="mini-select">CMC <ChevronDown size={11} /></button></div><div class="curve-content"><div class="curve-total"><strong>3.14</strong><small>Average mana value</small></div><div class="curve-chart">{#each curve as bar}<div><small>{bar.count}</small><i style={`--height:${bar.height}%`}></i><small>{bar.label}</small></div>{/each}</div></div></section>
-          <section class="panel"><div class="panel-heading"><span class="panel-title">Role balance</span><button class="icon-button" aria-label="Role settings"><ChevronDown size={14} /></button></div><div class="role-list">{#each roles as role}<button class="role-item" onclick={() => activeRole = activeRole === role ? 'all' : role}><i class={`role-mark role-${role}`}></i><span>{role}</span><b>{roleCount(role)}</b><i class="role-track"><i class={`bar-${role}`} style={`width:${Math.min(roleCount(role) * 10, 100)}%`}></i></i></button>{/each}</div><div class="role-foot"><span>Cards assigned</span><b>91 / 100</b></div></section>
+          <section class="panel"><div class="panel-heading"><span class="panel-title">Mana curve</span><button class="mini-select">CMC <ChevronDown size={11} /></button></div><div class="curve-content"><div class="curve-total"><strong>{averageCmc}</strong><small>Average mana value</small></div><div class="curve-chart">{#each dynamicCurve() as bar}<div><small>{bar.count}</small><i style={`--height:${bar.height}%`}></i><small>{bar.label}</small></div>{/each}</div></div></section>
+          <section class="panel"><div class="panel-heading"><span class="panel-title">Role balance</span><button class="icon-button" aria-label="Role settings"><ChevronDown size={14} /></button></div><div class="role-list">{#each roles as role}<button class="role-item" onclick={() => activeRole = activeRole === role ? 'all' : role}><i class={`role-mark role-${role}`}></i><span>{role}</span><b>{roleCount(role)}</b><i class="role-track"><i class={`bar-${role}`} style={`width:${Math.min(roleCount(role) * 10, 100)}%`}></i></i></button>{/each}</div><div class="role-foot"><span>Cards assigned</span><b>{cards.length} / 100</b></div></section>
         </aside>
       {:else}<button class="reopen" onclick={() => leftOpen = true} aria-label="Show commander panels"><PanelLeftClose size={15} /></button>{/if}
 
-      <section class="center-rail enter"><section class="panel deck-panel"><div class="panel-heading"><div><span class="panel-title">Deck library</span><small class="library-total">100 cards</small></div><div class="tools"><button class="icon-button" onclick={() => leftOpen = !leftOpen} aria-label="Toggle commander panels"><PanelLeftClose size={14} /></button><button class="icon-button" onclick={() => rightOpen = !rightOpen} aria-label="Toggle insight panels"><PanelRightClose size={14} /></button><button class="icon-button" aria-label="Additional filters"><Filter size={14} /></button></div></div>
+      <section class="center-rail enter"><section class="panel deck-panel"><div class="panel-heading"><div><span class="panel-title">Deck library</span><small class="library-total">{cards.length + (commander.name ? 1 : 0)} / 100 cards</small></div><div class="tools"><button class="icon-button" onclick={() => leftOpen = !leftOpen} aria-label="Toggle commander panels"><PanelLeftClose size={14} /></button><button class="icon-button" onclick={() => rightOpen = !rightOpen} aria-label="Toggle insight panels"><PanelRightClose size={14} /></button><button class="icon-button" aria-label="Additional filters"><Filter size={14} /></button></div></div>
         <div class="filter-toolbar"><div class="search-group"><label class="card-search"><Search size={13} /><input bind:value={cardQuery} placeholder="Find or filter cards..." aria-label="Search Scryfall cards" aria-autocomplete="list" aria-controls="scryfall-suggestions" aria-expanded={suggestions.length > 0} onkeydown={handleSearchKeydown} /></label><button class="search-submit" onclick={() => runCardSearch()} disabled={isSearching || !cardQuery.trim()} title="Search Scryfall" aria-label="Search Scryfall">{#if isSearching}<span class="search-spinner"></span>{:else}<Search size={13} />{/if}</button>{#if suggestions.length > 0}<div class="autocomplete-list" id="scryfall-suggestions" role="listbox" aria-label="Card name suggestions">{#each suggestions as suggestion, index}<button type="button" role="option" aria-selected={activeSuggestionIndex === index} class:suggestion-active={activeSuggestionIndex === index} onmouseenter={() => activeSuggestionIndex = index} onmousedown={(event) => event.preventDefault()} onclick={() => chooseSuggestion(suggestion)}><Search size={11} />{suggestion}</button>{/each}</div>{/if}</div><div class="role-filters"><button class:filter-active={activeRole === 'all'} onclick={() => activeRole = 'all'}>All <small>{(searchResults ?? cards).length}</small></button>{#each roles as role}<button class:filter-active={activeRole === role} onclick={() => activeRole = activeRole === role ? 'all' : role}>{role}</button>{/each}</div><div class="filter-controls"><label><ArrowDownWideNarrow size={12} /><select bind:value={sortBy} aria-label="Sort cards"><option value="name">Name</option><option value="mana">Mana value</option><option value="price">Price</option></select></label><button class:chosen={view === 'grid'} aria-label="Grid view" title="Grid view" onclick={() => view = 'grid'}><Grid2X2 size={13} /></button><button class:chosen={view === 'list'} aria-label="List view" title="List view" onclick={() => view = 'list'}><List size={14} /></button></div></div>
         {#if searchError}<p class="search-status error">{searchError}</p>{:else if searchResults}<p class="search-status">Scryfall results for “{searchResultsQuery}” · {searchResults.length} cards</p>{/if}
-        <div class="card-summary"><span><i></i>{filteredCards.length} shown</span><span><CircleDollarSign size={12} />${deckValue.toFixed(2)} market value</span></div><CardGrid cards={filteredCards} {view} onselect={(card) => selectedCard = card} /><button class="load-more">Showing {filteredCards.length} of 100 cards <ChevronDown size={13} /></button>
+        <div class="card-summary"><span><i></i>{filteredCards.length} shown</span><span><CircleDollarSign size={12} />${deckValue.toFixed(2)} market value</span></div><CardGrid cards={filteredCards} {view} onselect={(card) => selectedCard = card} />{#if cards.length > 0}<button class="load-more">Showing {filteredCards.length} of {cards.length} cards <ChevronDown size={13} /></button>{/if}
       </section></section>
 
       {#if rightOpen}
-        <aside class="right-rail enter"><section class="panel"><div class="panel-heading"><span class="panel-title">Deck health</span><strong class="health-score">● 86</strong></div><div class="health-metrics">{#each [{ name: 'Land count', value: '37', range: '/ 36–38', width: '88%' }, { name: 'Ramp sources', value: '12', range: '/ 10–12', width: '94%' }, { name: 'Card advantage', value: '10', range: '/ 10–12', width: '73%' }, { name: 'Interaction', value: '9', range: '/ 8–12', width: '69%' }] as metric}<div><span>{metric.name}</span><strong>{metric.value} <small>{metric.range}</small></strong><i><b style={`width:${metric.width}`}></b></i></div>{/each}</div><div class="health-foot"><Shield size={12} /> 4 structural signals reviewed</div></section>
+        <aside class="right-rail enter"><section class="panel"><div class="panel-heading"><span class="panel-title">Deck health</span><strong class="health-score">● {deckHealthScore()}</strong></div><div class="health-metrics">{#each dynamicHealthMetrics as metric}<div><span>{metric.name}</span><strong>{metric.value} <small>{metric.range}</small></strong><i><b style={`width:${metric.width}`}></b></i></div>{/each}</div><div class="health-foot"><Shield size={12} /> 4 structural signals reviewed</div></section>
           <section class="panel synergy-panel"><div class="panel-heading"><span class="panel-title">Synergy map</span><button class="text-action" onclick={() => activeView = 'engines'}>Open map <ChevronRight size={12} /></button></div><div class="graph-preview"><SynergyGraph cards={graphCards} /></div></section>
-          <section class="panel"><div class="panel-heading"><span class="panel-title">Collection value</span><TrendingUp size={14} color="#a3e635" /></div><div class="market-value"><strong>${deckValue.toFixed(2)}</strong><span>+ $4.82 <small>this month</small></span></div><div class="market-foot">Owned in collection <b>72 / 100</b></div></section>
-          <section class="panel saved-decks-panel"><div class="panel-heading"><span class="panel-title">Saved decks</span><small class="saved-count">{savedDecks.length}</small></div>{#if savedDecks.length === 0}<p class="no-saved-decks">Your saved decks will appear here.</p>{:else}<div class="saved-deck-list">{#each savedDecks.slice(0, 4) as savedDeck (savedDeck.id)}<div class="saved-deck-row"><span><strong>{savedDeck.name}</strong><small>{savedDeck.archetype}</small></span><b>{savedDeck.cards.length}</b></div>{/each}</div>{/if}</section>
+          <section class="panel"><div class="panel-heading"><span class="panel-title">Collection value</span><TrendingUp size={14} color="#a3e635" /></div><div class="market-value"><strong>${deckValue.toFixed(2)}</strong><span>${userCollection.reduce((sum, c) => sum + (c.currentPriceUsd ?? 0) * (c.quantity || 1), 0).toFixed(2)} <small>in collection</small></span></div><div class="market-foot">Owned in collection <b>{ownedInCollectionCount()} / {cards.length}</b></div></section>
+          <section class="panel saved-decks-panel"><div class="panel-heading"><span class="panel-title">Saved decks</span><div class="saved-header-tools"><button class="mini-new-btn" onclick={initEmptyDeck} title="Create empty deck"><Plus size={10} /> New</button><small class="saved-count">{savedDecks.length}</small></div></div>{#if savedDecks.length === 0}<p class="no-saved-decks">No saved decks yet.</p>{:else}<div class="saved-deck-list">{#each savedDecks.slice(0, 5) as savedDeck (savedDeck.id)}<button class="saved-deck-row" class:active-saved={savedDeck.id === deck.id} onclick={() => loadSavedDeck(savedDeck)}><span><strong>{savedDeck.name}</strong><small>{savedDeck.archetype}</small></span><b>{savedDeck.cards.length}</b></button>{/each}</div>{/if}</section>
           <section class="panel"><div class="panel-heading"><span class="panel-title">Test a hand</span><button class="text-action" onclick={() => activeView = 'goldfish'}>Open bench <ChevronRight size={12} /></button></div><button class="goldfish-teaser" onclick={() => activeView = 'goldfish'}><i><Swords size={15} /></i><span><strong>Turn 1–5 goldfish</strong><small>Keep, mulligan, sequence.</small></span><ChevronRight size={14} /></button></section>
         </aside>
       {:else}<button class="reopen" onclick={() => rightOpen = true} aria-label="Show deck insights"><PanelRightClose size={15} /></button>{/if}
@@ -805,7 +950,11 @@
   .search-group{position:relative}.autocomplete-list{position:absolute;z-index:15;top:calc(100% + 4px);right:32px;left:0;display:grid;max-height:240px;overflow-y:auto;padding:4px;border:1px solid #38383f;border-radius:5px;background:#17171b;box-shadow:0 12px 28px #0009}.autocomplete-list button{display:flex;min-height:30px;align-items:center;gap:7px;padding:0 8px;border:0;border-radius:3px;background:transparent;color:#c4c4cb;font-size:9px;text-align:left;cursor:pointer}.autocomplete-list button :global(svg){color:#777780}.autocomplete-list button:hover,.autocomplete-list button.suggestion-active{background:#222a30;color:#e0f2fe}.autocomplete-list button.suggestion-active :global(svg){color:#38bdf8}
   .audit-summary{display:grid;gap:7px;padding:10px 11px;border-bottom:1px solid #25252a}.audit-summary>div{display:flex;align-items:center;justify-content:space-between;color:#888891;font-size:8px}.audit-summary strong{color:#d4d4d8;font:9px var(--mono)}
   .health-score{color:#bef264;font:10px var(--mono)}.health-metrics{display:grid;gap:9px;padding:11px}.health-metrics>div{display:grid;grid-template-columns:1fr auto;gap:5px;color:#888891;font-size:8px}.health-metrics strong{color:#d4d4d8;font:9px var(--mono)}.health-metrics small{color:#666671;font:8px 'Space Grotesk',sans-serif}.health-metrics>div>i{grid-column:1/-1;height:3px;overflow:hidden;border-radius:3px;background:#2b2b30}.health-metrics>div>i>b{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0e7490,#38bdf8)}.health-foot{display:flex;align-items:center;gap:6px;padding:8px 11px;border-top:1px solid #25252a;color:#71717a;font-size:8px}.health-foot :global(svg){color:#a855f7}.text-action{display:flex;align-items:center;gap:2px;border:0;background:transparent;color:#7dd3fc;font-size:8px;cursor:pointer}.graph-preview{height:188px;overflow:hidden}.graph-preview :global(.graph-shell){min-height:0}.graph-preview :global(.graph-toolbar){height:24px}.graph-preview :global(.flow-stage){height:137px}.graph-preview :global(.graph-legend){min-height:27px;gap:6px;font-size:7px}.graph-preview :global(.chain-count),.graph-preview :global(.svelte-flow__minimap){display:none}.market-value{display:flex;align-items:baseline;gap:8px;padding:11px}.market-value strong{color:#f4f4f5;font:500 18px var(--mono)}.market-value span{color:#a3e635;font:8px var(--mono)}.market-value small{color:#777780;font:8px 'Space Grotesk',sans-serif}.goldfish-teaser{display:flex;width:100%;align-items:center;gap:9px;padding:10px;border:0;background:transparent;text-align:left;cursor:pointer}.goldfish-teaser>i{display:grid;width:30px;height:30px;place-items:center;border:1px solid #38bdf83d;border-radius:5px;background:#0e749021;color:#7dd3fc}.goldfish-teaser>span{display:grid;flex:1;gap:3px}.goldfish-teaser strong{color:#d4d4d8;font-size:9px}.goldfish-teaser small{color:#777780;font-size:8px}.reopen{position:sticky;top:76px;display:grid;width:25px;height:34px;place-items:center;border:1px solid #303036;border-radius:5px;background:#17171a;color:#a1a1aa;cursor:pointer}.page-footer{display:flex;justify-content:space-between;margin-top:17px;padding-top:10px;border-top:1px solid #232328;color:#5e5e68;font:8px var(--mono)}.page-footer span:first-child{display:flex;align-items:center;gap:6px}.page-footer .status-dot{width:5px;height:5px}
-  .saved-count{color:#7dd3fc;font:8px var(--mono)}.no-saved-decks{margin:0;padding:12px;color:#777780;font-size:8px}.saved-deck-list{display:grid;padding:3px 10px}.saved-deck-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 1px;border-bottom:1px solid #25252a}.saved-deck-row:last-child{border-bottom:0}.saved-deck-row>span{display:grid;min-width:0;gap:3px}.saved-deck-row strong{overflow:hidden;color:#d4d4d8;font-size:9px;text-overflow:ellipsis;white-space:nowrap}.saved-deck-row small{color:#777780;font-size:8px}.saved-deck-row>b{color:#8d8d97;font:8px var(--mono)}
+  .no-commander-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#71717a;font-size:9px;gap:5px;background:#13151b}
+  .saved-header-tools{display:flex;align-items:center;gap:6px}
+  .mini-new-btn{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border:1px solid #38bdf840;border-radius:3px;background:#0e749020;color:#38bdf8;font-size:8px;font-weight:600;cursor:pointer}
+  .mini-new-btn:hover{background:#0e749040}
+  .saved-count{color:#7dd3fc;font:8px var(--mono)}.no-saved-decks{margin:0;padding:12px;color:#777780;font-size:8px}.saved-deck-list{display:grid;padding:3px 10px}.saved-deck-row{display:flex;width:100%;background:transparent;border:0;border-bottom:1px solid #25252a;align-items:center;justify-content:space-between;gap:8px;padding:8px 1px;text-align:left;cursor:pointer}.saved-deck-row:hover{background:#18181d}.saved-deck-row.active-saved{border-left:2px solid #38bdf8;padding-left:4px}.saved-deck-row:last-child{border-bottom:0}.saved-deck-row>span{display:grid;min-width:0;gap:3px}.saved-deck-row strong{overflow:hidden;color:#d4d4d8;font-size:9px;text-overflow:ellipsis;white-space:nowrap}.saved-deck-row small{color:#777780;font-size:8px}.saved-deck-row>b{color:#8d8d97;font:8px var(--mono)}
   .single-view{width:min(620px,100%);margin:15px auto 0}.engines-view{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(235px,.8fr);align-items:start;gap:11px;padding-top:13px}.engine-panel{overflow:hidden}.engine-panel .panel-heading{min-height:50px}.engine-panel .panel-heading small{display:block;margin-top:3px;color:#777780;font-size:8px}.live{color:#6fce8d!important;font:7px var(--mono)!important}.note{display:grid;grid-template-columns:19px 1fr;gap:8px;padding:11px;border-bottom:1px solid #25252a}.note>b{color:#38bdf8;font:9px var(--mono)}.note strong{color:#d4d4d8;font-size:9px}.note p{margin:5px 0 0;color:#888891;font-size:8px;line-height:1.5}
   @media(min-width:1150px){.filter-toolbar{grid-template-columns:minmax(90px,.7fr) auto}.role-filters{grid-column:auto}.filter-controls{grid-column:1/-1;margin-top:-3px}}
   @media(max-width:1050px){.workspace{grid-template-columns:minmax(200px,.8fr) minmax(360px,1.4fr)}.right-rail{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr))}.workspace.left-collapsed{grid-template-columns:26px minmax(0,1fr)}.workspace.right-collapsed{grid-template-columns:minmax(200px,.8fr) minmax(360px,1.4fr) 26px}.workspace.left-collapsed.right-collapsed{grid-template-columns:26px minmax(0,1fr) 26px}.right-rail .synergy-panel{grid-row:span 2}}

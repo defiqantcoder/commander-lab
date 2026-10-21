@@ -130,6 +130,13 @@
   });
 </script>
 
+{#if cards.length < 7}
+  <div class="empty-bench panel">
+    <Swords size={32} class="empty-icon" />
+    <h3>Goldfish Simulator</h3>
+    <p>Simulating opening hands and Turn 1–5 goldfish curves requires at least 7 cards in your library. Add cards or import your decklist in the Studio to begin testing.</p>
+  </div>
+{:else}
 <section class="bench">
   <div class="bench-heading">
     <div><div class="bench-kicker">GOLDFISH BENCH</div><h3>Opening line</h3></div>
@@ -203,8 +210,13 @@
 
   <div class="bench-footer"><span class="simulation-state"><i></i> {selectedTurn === 0 ? 'Opening hand ready' : `Turn ${selectedTurn} · ${manaAvailable} mana available`}</span><div><button class="advance" disabled={selectedTurn <= 1} onclick={() => selectTurn(selectedTurn - 1)} aria-label="Previous turn"><ChevronLeft size={14} /></button><button class="advance next-turn" disabled={!kept || simulator.turnNumber >= 5} onclick={advanceTurn} aria-label="Start next turn">{simulator.turnNumber === 0 ? 'Start turn' : 'Next turn'} <ChevronRight size={14} /></button></div></div>
 </section>
+{/if}
 
 <style>
+  .empty-bench { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; gap: 10px; border: 1px dashed #2b2b30; border-radius: 8px; background: rgba(20, 20, 23, 0.4); margin: 20px auto; max-width: 540px; }
+  .empty-bench :global(.empty-icon) { color: #38bdf8; }
+  .empty-bench h3 { margin: 0; color: #f4f4f5; font-size: 16px; font-weight: 600; }
+  .empty-bench p { margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.5; max-width: 400px; }
   .bench { padding: 13px; }
   .bench-heading { display: flex; align-items: center; justify-content: space-between; }
   .bench-kicker { color: #71717a; font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }

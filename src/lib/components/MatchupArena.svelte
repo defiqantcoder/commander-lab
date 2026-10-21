@@ -99,6 +99,13 @@
   }
 </script>
 
+{#if cards.length === 0}
+  <div class="empty-arena panel">
+    <Target size={32} class="empty-icon text-sky" />
+    <h3>Matchup Sparring Arena</h3>
+    <p>Your deck is currently empty. Add cards or import your decklist in the Studio to benchmark and spar against EDHREC archetypes.</p>
+  </div>
+{:else}
 <section class="arena panel">
   <header class="arena-heading">
     <div>
@@ -201,8 +208,13 @@
     <div class="arena-empty"><span><Swords size={20} /></span><strong>Ready when you are</strong><small>Choose an opponent and run five simulated games.</small></div>
   {/if}
 </section>
+{/if}
 
 <style>
+  .empty-arena { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; gap: 10px; border: 1px dashed #2b2b30; border-radius: 8px; background: rgba(20, 20, 23, 0.4); margin: 20px auto; max-width: 540px; }
+  .empty-arena :global(.empty-icon) { color: #38bdf8; }
+  .empty-arena h3 { margin: 0; color: #f4f4f5; font-size: 16px; font-weight: 600; }
+  .empty-arena p { margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.5; max-width: 400px; }
   .arena { width:min(920px,100%); margin:16px auto 0; overflow:hidden; }
   .arena-heading { display:flex; align-items:center; justify-content:space-between; padding:17px 18px; border-bottom:1px solid #25252a; }
   .eyebrow { color:#73737d; font:8px var(--mono); letter-spacing:.1em; }
