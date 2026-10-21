@@ -81,6 +81,26 @@ export interface AIMarketAnalysisResult {
   safeHavenHoldings: AISafeHavenHolding[];
 }
 
+export interface AIPriorityRemovalTarget {
+  cardName: string;
+  reason: string;
+  optimalTiming: string;
+}
+
+export interface AIMatchupCoachingResult {
+  matchupVerdict: string;
+  pivotTurn: number;
+  pivotTurnAnalysis: string;
+  priorityRemovalTargets: AIPriorityRemovalTarget[];
+  matchupStrengths: string[];
+  matchupVulnerabilities: string[];
+  sideboardSwaps: {
+    suggestedAdditions: Array<{ cardName: string; reason: string; role: string }>;
+    suggestedCuts: Array<{ cardName: string; reason: string }>;
+  };
+  tacticalGamePlan: string;
+}
+
 export interface GeminiTestResult {
   success: boolean;
   message: string;
@@ -618,5 +638,187 @@ Return a JSON object conforming to:
     portfolioHealthAssessment: 'Neutral',
     sellRecommendations: [],
     safeHavenHoldings: []
+  };
+}
+
+/**
+ * Generates bespoke AI coaching and matchup strategy comparing player deck vs opponent deck.
+ * Pinpoints the critical pivot turn, priority removal targets, and sideboarding swaps.
+ */
+export async function analyzeMatchupWithAI(
+  playerDeckName: string,
+  playerCards: Array<{ name: string; typeLine?: string; category?: string }>,
+  opponentDeckName: string,
+  opponentCards: Array<{ name: string; typeLine?: string; category?: string }>,
+  simulationStats?: { playerWins: number; opponentWins: number; gamesSimulated: number },
+  model: string = GEMINI_DEFAULT_MODEL
+): Promise<AIMatchupCoachingResult> {
+  const apiKey = getGeminiApiKey();
+
+  const playerCommander = playerCards.find((c) => c.category === 'commander')?.name || playerDeckName;
+  const opponentCommander = opponentCards.find((c) => c.category === 'commander')?.name || opponentDeckName;
+
+  if (!apiKey) {
+    // Rich offline fallback
+    const isAggro = /aggro|token|burn/i.test(opponentDeckName);
+    const pivot = isAggro ? 3 : 5;
+    return {
+      matchupVerdict: `Competitive sparring series against ${opponentDeckName}. ${isAggro ? 'Early clock pressure requires immediate defensive stabilization.' : 'Mid-game engine race requires interaction pacing.'}`,
+      pivotTurn: pivot,
+      pivotTurnAnalysis: `Turn ${pivot} is the decisive inflection point. Opponent intends to deploy key threat or payoff; holding up 1–2 mana for instant interaction or a sweeper determines the outcome.`,
+      priorityRemovalTargets: [
+        {
+          cardName: opponentCommander,
+          reason: 'Primary engine and synergy anchor of the opponent deck.',
+          optimalTiming: 'Remove immediately on cast or before first activated ability / attack step.'
+        },
+        {
+          cardName: 'Core Engine / Value Permanent',
+          reason: 'Compounds opponent resource generation and accelerates their clock.',
+          optimalTiming: 'Target at opponent end step to deny untap value.'
+        }
+      ],
+      matchupStrengths: [
+        'Resilient mid-to-late game card advantage once stabilized.',
+        'Sufficient ramp density to re-cast commander despite commander tax.'
+      ],
+      matchupVulnerabilities: [
+        isAggro ? 'Vulnerable to explosive unblocked attacks prior to Turn 4.' : 'Vulnerable to heavy counterspell tax or asymmetric board sweeps.'
+      ],
+      sideboardSwaps: {
+        suggestedAdditions: [
+          { cardName: 'Toxic Deluge', role: 'Board Wipe', reason: 'Efficient 3-CMC reset that handles fast boards.' },
+          { cardName: 'Swan Song', role: 'Interaction', reason: '1-mana counter to stop opponent game-winning spells.' }
+        ],
+        suggestedCuts: [
+          { cardName: 'Top-Heavy (>6 CMC) Spell', reason: 'Too slow to impact the decisive early pivot turns.' }
+        ]
+      },
+      tacticalGamePlan: `Play conservatively through Turns 1–${pivot}. Avoid over-committing to the board without protection mana open. Save targeted removal strictly for ${opponentCommander} or game-winning combos.`
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const playerSample = playerCards.slice(0, 40).map((c) => c.name).join(', ');
+  const opponentSample = opponentCards.slice(0, 40).map((c) => c.name).join(', ');
+  const statsSummary = simulationStats
+    ? `Simulation score: Player ${simulationStats.playerWins} - Opponent ${simulationStats.opponentWins} (out of ${simulationStats.gamesSimulated} games).`
+    : '';
+
+  const prompt = `You are a world-class Magic: The Gathering competitive Commander coach powered by Google Gemini.
+Analyze this Commander matchup:
+- Player Deck: "${playerDeckName}" (Commander: ${playerCommander})
+  Key cards: ${playerSample}
+- Opponent Deck: "${opponentDeckName}" (Commander: ${opponentCommander})
+  Key cards: ${opponentSample}
+${statsSummary}
+
+Please deliver an elite strategic matchup breakdown:
+1. Identify the critical "Pivot Turn" (turn number 1-8) and explain why that turn decides the match.
+2. List 2-3 Priority Removal Targets from the opponent's deck with optimal timing windows.
+3. List the player's core matchup strengths and key vulnerabilities against this specific opponent.
+4. Recommend 2 high-impact additions and 1-2 cuts to optimize against this opponent.
+5. Provide a cohesive 2-sentence tactical game plan.
+
+Return a JSON object conforming to:
+- matchupVerdict: string
+- pivotTurn: number (between 1 and 8)
+- pivotTurnAnalysis: string
+- priorityRemovalTargets: array of { cardName: string, reason: string, optimalTiming: string }
+- matchupStrengths: array of strings
+- matchupVulnerabilities: array of strings
+- sideboardSwaps: {
+    suggestedAdditions: array of { cardName: string, reason: string, role: string },
+    suggestedCuts: array of { cardName: string, reason: string }
+  }
+- tacticalGamePlan: string`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            matchupVerdict: { type: Type.STRING },
+            pivotTurn: { type: Type.NUMBER },
+            pivotTurnAnalysis: { type: Type.STRING },
+            priorityRemovalTargets: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  cardName: { type: Type.STRING },
+                  reason: { type: Type.STRING },
+                  optimalTiming: { type: Type.STRING }
+                },
+                required: ['cardName', 'reason', 'optimalTiming']
+              }
+            },
+            matchupStrengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            matchupVulnerabilities: { type: Type.ARRAY, items: { type: Type.STRING } },
+            sideboardSwaps: {
+              type: Type.OBJECT,
+              properties: {
+                suggestedAdditions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      cardName: { type: Type.STRING },
+                      reason: { type: Type.STRING },
+                      role: { type: Type.STRING }
+                    },
+                    required: ['cardName', 'reason', 'role']
+                  }
+                },
+                suggestedCuts: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      cardName: { type: Type.STRING },
+                      reason: { type: Type.STRING }
+                    },
+                    required: ['cardName', 'reason']
+                  }
+                }
+              },
+              required: ['suggestedAdditions', 'suggestedCuts']
+            },
+            tacticalGamePlan: { type: Type.STRING }
+          },
+          required: [
+            'matchupVerdict',
+            'pivotTurn',
+            'pivotTurnAnalysis',
+            'priorityRemovalTargets',
+            'matchupStrengths',
+            'matchupVulnerabilities',
+            'sideboardSwaps',
+            'tacticalGamePlan'
+          ]
+        }
+      }
+    });
+
+    if (response.text) {
+      return JSON.parse(response.text) as AIMatchupCoachingResult;
+    }
+  } catch (error) {
+    console.error('Error in Gemini matchup analysis:', error);
+  }
+
+  return {
+    matchupVerdict: 'Unable to generate AI matchup analysis at this time.',
+    pivotTurn: 4,
+    pivotTurnAnalysis: 'Focus on developing mana on curve and holding interaction.',
+    priorityRemovalTargets: [],
+    matchupStrengths: [],
+    matchupVulnerabilities: [],
+    sideboardSwaps: { suggestedAdditions: [], suggestedCuts: [] },
+    tacticalGamePlan: 'Play to your core synergies while tracking opponent open mana.'
   };
 }

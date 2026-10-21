@@ -8,6 +8,7 @@ import {
   generateFreshDeckWithAI,
   analyzeDeckWithAI,
   analyzeMarketWithAI,
+  analyzeMatchupWithAI,
   GEMINI_DEFAULT_MODEL
 } from './gemini';
 
@@ -275,6 +276,83 @@ describe('gemini engine', () => {
 
       const result = await analyzeMarketWithAI([]);
       expect(result.sellRecommendations).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('analyzeMatchupWithAI', () => {
+    it('returns rich offline matchup coaching when no API key is provided', async () => {
+      process.env.GEMINI_API_KEY = '';
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('gemini_api_key');
+      }
+
+      const result = await analyzeMatchupWithAI(
+        'Urza Stax',
+        [{ name: 'Urza, Lord High Artificer', category: 'commander' }, { name: 'Static Orb' }],
+        'Krenko Aggro',
+        [{ name: 'Krenko, Mob Boss', category: 'commander' }, { name: 'Goblin Chieftain' }],
+        { playerWins: 3, opponentWins: 2, gamesSimulated: 5 }
+      );
+
+      expect(result.pivotTurn).toBe(3);
+      expect(result.pivotTurnAnalysis).toContain('Turn 3');
+      expect(result.priorityRemovalTargets.length).toBeGreaterThan(0);
+      expect(result.priorityRemovalTargets[0].cardName).toBe('Krenko, Mob Boss');
+      expect(result.sideboardSwaps.suggestedAdditions.length).toBeGreaterThan(0);
+      expect(result.tacticalGamePlan).toContain('Krenko, Mob Boss');
+      expect(mockGenerateContent).not.toHaveBeenCalled();
+    });
+
+    it('returns parsed AI matchup coaching when API call succeeds', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      const mockCoachingResult = {
+        matchupVerdict: 'High-leverage control vs aggro dynamic.',
+        pivotTurn: 4,
+        pivotTurnAnalysis: 'Turn 4 defines the game: Krenko looks to tap with haste.',
+        priorityRemovalTargets: [
+          {
+            cardName: 'Thornbite Staff',
+            reason: 'Infinite goblin untap engine piece.',
+            optimalTiming: 'Remove in response to equip trigger.'
+          }
+        ],
+        matchupStrengths: ['Superior card draw and asymmetric stax locks.'],
+        matchupVulnerabilities: ['Vulnerable to red burn if life drops below 15.'],
+        sideboardSwaps: {
+          suggestedAdditions: [
+            { cardName: 'Aetherize', role: 'Interaction', reason: 'Bounces entire goblin army during combat.' }
+          ],
+          suggestedCuts: [
+            { cardName: 'Rhystic Study', reason: 'Too slow when facing immediate lethal damage.' }
+          ]
+        },
+        tacticalGamePlan: 'Deploy early blockers and hold Aetherize until Krenko alpha strikes.'
+      };
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockCoachingResult) });
+
+      const result = await analyzeMatchupWithAI(
+        'Urza Stax',
+        [{ name: 'Urza' }],
+        'Krenko Aggro',
+        [{ name: 'Krenko' }]
+      );
+
+      expect(result.pivotTurn).toBe(4);
+      expect(result.priorityRemovalTargets[0].cardName).toBe('Thornbite Staff');
+      expect(result.sideboardSwaps.suggestedAdditions[0].cardName).toBe('Aetherize');
+      expect(result.sideboardSwaps.suggestedCuts[0].cardName).toBe('Rhystic Study');
+    });
+
+    it('handles AI matchup analysis error gracefully', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      mockGenerateContent.mockRejectedValueOnce(new Error('Timeout'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await analyzeMatchupWithAI('Deck A', [], 'Deck B', []);
+      expect(result.pivotTurn).toBe(4);
+      expect(result.matchupVerdict).toContain('Unable to generate');
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     });

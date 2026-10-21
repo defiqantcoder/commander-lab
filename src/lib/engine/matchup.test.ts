@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MatchupSimulator, EDHREC_BENCHMARK_DECKS } from './matchup';
+import { MatchupSimulator, EDHREC_BENCHMARK_DECKS, createCustomOpponentDeck } from './matchup';
 import type { SimCard } from './goldfish';
 
 describe('MatchupSimulator', () => {
@@ -40,6 +40,21 @@ describe('MatchupSimulator', () => {
     expect(report.identifiedWeaknesses.length).toBeGreaterThanOrEqual(1);
     expect(report.recommendedImprovements.suggestedAdditions.length).toBeGreaterThanOrEqual(1);
     expect(report.recommendedImprovements.coachingAdvice.length).toBeGreaterThan(10);
+  });
+
+  it('creates an authentic 100-card custom opponent deck for any commander', () => {
+    const custom = createCustomOpponentDeck('Edgar Markov', 'Aggro');
+    expect(custom.cards.length).toBe(100);
+    expect(custom.commanderName).toBe('Edgar Markov');
+    expect(custom.archetype).toBe('Aggro');
+    expect(custom.cards[0].name).toBe('Edgar Markov');
+    expect(custom.cards[0].isCommander).toBe(true);
+
+    // Verify it spars properly
+    const sim = new MatchupSimulator(testDeck, custom.cards, 'Player Deck', custom.name);
+    const report = sim.runMatchupSeries(3);
+    expect(report.gamesSimulated).toBe(3);
+    expect(report.playerWins + report.opponentWins).toBe(3);
   });
 });
 

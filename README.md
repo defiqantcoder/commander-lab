@@ -291,6 +291,11 @@ function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[])
      - Generates tailored, cohesive decklists with card roles, CMC, synergy rationales, and budget alternatives across the entire Magic: The Gathering card pool.
      - **Optional Collection Integration:** Building from the user's collection is purely optional; AI draws from the entire MTG universe by default, with an optional toggle to prioritize owned cards where synergistic.
      - 1-click **"Load Deck into Studio"** converts generated cards into live Studio cards with instant persistence in IndexedDB.
+   - **AI Matchup Sparring Coach & Custom Opponent Generator (`src/lib/components/MatchupArena.svelte` & `src/lib/engine/matchup.ts`):**
+     - Dynamic benchmark sparring deck generator (`createCustomOpponentDeck`) supporting *any* commander in MTG history paired with archetypes (Spellslinger, Stax, Aggro, Graveyard, Combo, Voltron, Aristocrats, Ramp).
+     - Live Scryfall autocomplete search drawer to configure and spawn custom opponent decks on the fly.
+     - AI Matchup Sparring Coach calculates the decisive **Pivot Turn** (the critical turn window before the opponent locks their engine), identifies **Priority Removal Targets** with specific timing windows, outlines match strengths/vulnerabilities, and provides 1-click sideboard **Add/Cut** deck adaptations.
+     - Powered by a 500-game Monte Carlo goldfish vs. goldfish simulator evaluating win rate, average win turn, and turn distribution curve.
    - **AI Piloting & Synergy Deep Scan (`src/lib/components/PilotGuide.svelte`):**
      - On-demand **"AI Deep Scan"** button dynamically analyzes the user's active deck and collection.
      - Discovers dynamic multi-card combos, infinite loops, and hidden synergy lines beyond static registries.
@@ -312,36 +317,33 @@ function runTestSparring(userCards: SimCard[], selectedOpponentCards: SimCard[])
      - Added format-defining combos: *Niv-Mizzet, Parun + Curiosity*, *Witherbloom Apprentice + Chain of Smog*, *Basalt Monolith + Kinnan, Bonder Prodigy*, *Karmic Guide + Reveillark*, and *Dockside Extortionist + Temur Sabertooth*.
    - **Reserved List Vault Expansion:** Added 20 missing Reserved List staples (*Gilded Drake, Intuition, Time Spiral, Mishra's Workshop, Bazaar of Baghdad, Lake of the Dead, Mind Over Matter*, etc.).
 3. **Test Suite & Build Verification:**
-   - Full Vitest suite is at **98 / 98 passing tests** across 11 test suites.
-   - Vite production build (`npm run build`) succeeds cleanly with PWA service worker precaching.
+   - Full Vitest suite is at **102 / 102 passing tests** across 11 test suites.
+   - Vite production build (`npm run build`) succeeds cleanly with zero warnings and PWA service worker precaching.
 
 ---
 
 ### Jules Background Task Assignment (Ready for Submission)
 
-**Task Title:** Add Vitest Unit Tests for AI Deck Generation, AI Deep Scan, and AI Market Advisor (`src/lib/ai/ai-features-stress.test.ts`)
+**Task Title:** Add Unit Tests for Dynamic Opponent Generation and Matchup Strategy Edge Cases (`src/lib/engine/matchup-custom.test.ts`)
 
 **Task Description:**
 ```text
-Write comprehensive offline Vitest unit tests in `src/lib/ai/ai-features-stress.test.ts` verifying the new AI-powered features in `src/lib/ai/gemini.ts`:
-1. Test `generateFreshDeckWithAI`:
-   - Verify it functions offline without an API key (returns valid deck structure with categories, cmc, and synergyRationale).
-   - Verify it accepts optional user collection card arrays without failing when empty or omitted.
-   - Test mocked API responses with diverse archetypes (Artifact Storm, Spellslinger, Voltron, Enchantress).
-2. Test `analyzeDeckWithAI`:
-   - Verify offline fallback returns dynamicCombos, collectionUpgrades, and pilotingSecrets.
-   - Test mocked response with multi-card infinite combos and owned collection upgrades.
-3. Test `analyzeMarketWithAI`:
-   - Verify offline fallback correctly calculates sell recommendations for non-reserved cards over $15 and identifies Reserved List cards as safe havens.
-   - Test mocked response with urgency classifications ('Immediate', 'Upcoming Cycle', 'Monitor').
-4. Ensure no outbound network calls are made (mock @google/genai cleanly as done in gemini.test.ts).
-5. Ensure `npm test` passes cleanly with 100% green tests.
+Write Vitest unit tests in `src/lib/engine/matchup-custom.test.ts` verifying the new Custom Opponent and AI Matchup features:
+1. Test `createCustomOpponentDeck`:
+   - Verify it creates a valid 100-card deck with exactly 1 commander and 99 library cards for arbitrary commanders across all archetypes.
+   - Verify that all archetypes (Aggro, Control, Combo, Stax, Spellslinger, Aristocrats, Ramp, Voltron, Midrange) generate distinct card role distributions and appropriate land counts.
+   - Verify commander color identity enforcement in the generated deck.
+2. Test `MatchupSimulator.simulateMatchup`:
+   - Verify running 100-500 simulations against custom opponent decks yields valid win rates (0-100%), average win turns (>= 1), and log entries without throwing runtime errors.
+3. Test `analyzeMatchupWithAI`:
+   - Verify offline fallback generates valid pivotTurn, removal targets, strengths, and sideboard suggestions when given custom opponent decks.
+4. Ensure 100% offline execution with mock fixtures and that all tests pass cleanly.
 ```
 
 ---
 
-### Next Steps for Next Session
+### Next Steps & Upcoming Roadmap
 1. **Interactive Node Visualizer Optimization (`src/lib/components/SynergyGraph.svelte`):** Connect AI-discovered dynamic combos directly into the interactive Svelte Flow graph so AI-uncovered loops render as highlighted cyclic nodes.
 2. **Collection Bulk Import (CSV / Delver Lens / ManaBox):** Add a 1-click bulk CSV / text import in the collection view so users can paste their binders into Dexie in seconds.
-3. **Goldfish AI Play-by-Play Coach:** Allow Gemini to evaluate the goldfish simulator hand on each turn and recommend optimal sequence lines.
+3. **Turn-by-Turn AI Goldfish Advisor:** Allow Gemini to evaluate simulated turn-by-turn hand states and suggest optimal land sequencing, mulligan decisions, and priority lines.
 

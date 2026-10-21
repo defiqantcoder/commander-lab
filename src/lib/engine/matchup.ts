@@ -86,6 +86,39 @@ export const EDHREC_BENCHMARK_DECKS: BenchmarkDeck[] = [
   }
 ];
 
+/**
+ * Creates an authentic 100-card simulated sparring opponent anchored by any commander.
+ */
+export function createCustomOpponentDeck(
+  commanderName: string,
+  archetype: 'Aggro' | 'Control' | 'Midrange' | 'Combo' = 'Midrange'
+): BenchmarkDeck {
+  const isAggro = archetype === 'Aggro';
+  const isControl = archetype === 'Control';
+
+  const landCount = isAggro ? 35 : isControl ? 38 : 36;
+  const rampCount = isAggro ? 10 : 12;
+  const removalCount = isControl ? 20 : 12;
+  const engineCount = isAggro ? 28 : isControl ? 15 : 24;
+  const payoffCount = 100 - (1 + landCount + rampCount + removalCount + engineCount);
+
+  return {
+    id: `custom-opp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    name: `Custom Benchmark: ${commanderName}`,
+    commanderName,
+    archetype,
+    description: `Custom sparring benchmark anchored by ${commanderName} (${archetype}).`,
+    cards: [
+      { id: 'c-cmd', name: commanderName, typeLine: 'Legendary Creature', cmc: 4, category: 'commander', isCommander: true },
+      ...Array.from({ length: landCount }, (_, i) => ({ id: `c-land-${i}`, name: 'Command Tower / Land', typeLine: 'Land', cmc: 0, category: 'land' })),
+      ...Array.from({ length: rampCount }, (_, i) => ({ id: `c-ramp-${i}`, name: `Arcane Signet ${i}`, typeLine: 'Artifact', cmc: 2, category: 'ramp' })),
+      ...Array.from({ length: engineCount }, (_, i) => ({ id: `c-eng-${i}`, name: `Synergy Engine ${i}`, typeLine: 'Creature', cmc: (i % 3) + 2, category: 'engine' })),
+      ...Array.from({ length: removalCount }, (_, i) => ({ id: `c-rem-${i}`, name: `Removal / Interaction ${i}`, typeLine: 'Instant', cmc: (i % 2) + 1, category: 'interaction' })),
+      ...Array.from({ length: payoffCount }, (_, i) => ({ id: `c-pay-${i}`, name: `Key Payoff ${i}`, typeLine: 'Spell', cmc: (i % 3) + 4, category: 'payoff' }))
+    ]
+  };
+}
+
 export class MatchupSimulator {
   private deckA: SimCard[];
   private deckB: SimCard[];
