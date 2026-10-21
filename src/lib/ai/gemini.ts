@@ -224,7 +224,9 @@ export async function brainstormArchetypes(
   const ai = new GoogleGenAI({ apiKey });
   const prompt = `You are an elite Magic: The Gathering rules judge and Commander architect powered by Google Gemini.
 Analyze the commander "${commanderName}" with color identity [${colorIdentity.join(', ')}].
-Brainstorm 3 distinct, fresh, unconventional deck themes. Focus on non-obvious replacement effects, triggered ability chains, and obscure rules interactions far beyond typical EDHREC staples.
+Brainstorm 3 distinct, fresh, unconventional deck themes across different power levels:
+- Ensure at least one theme is specifically "Casual" (kitchen-table friendly, fun synergy engines, board-focused, no fast mana or oppressive 2-card infinites).
+- Focus on non-obvious replacement effects, triggered ability chains, and obscure rules interactions far beyond typical EDHREC staples.
 
 Return a JSON array of objects with the following schema:
 - themeName: string
@@ -283,11 +285,42 @@ export async function generateFreshDeckWithAI(
   colorIdentity: string[],
   archetype: string,
   userCollectionCardNames: string[] = [],
+  powerTier: 'Casual' | 'Focused' | 'Optimized' = 'Casual',
   model: string = GEMINI_DEFAULT_MODEL
 ): Promise<GeneratedDeckResult> {
   const apiKey = getGeminiApiKey();
 
   if (!apiKey) {
+    if (powerTier === 'Casual') {
+      return {
+        commanderName,
+        archetype: `${archetype} (Casual)`,
+        estimatedSaltScore: 16,
+        cards: [
+          { name: 'Sol Ring', category: 'ramp', cmc: 1, synergyRationale: 'Universal mana acceleration.' },
+          { name: 'Arcane Signet', category: 'ramp', cmc: 2, synergyRationale: 'Universal color fixing.' },
+          { name: 'Command Tower', category: 'land', cmc: 0, synergyRationale: 'Untapped multi-color fixing.' },
+          { name: 'Cultivate', category: 'ramp', cmc: 3, synergyRationale: 'Relaxed land acceleration and hand fixing.' },
+          { name: 'Kodama\'s Reach', category: 'ramp', cmc: 3, synergyRationale: 'Consistent baseline mana ramp.' },
+          { name: 'Sakura-Tribe Elder', category: 'ramp', cmc: 2, synergyRationale: 'Chump block and land search.' },
+          { name: 'Beast Within', category: 'interaction', cmc: 3, synergyRationale: 'Friendly catch-all removal.' },
+          { name: 'Swords to Plowshares', category: 'interaction', cmc: 1, synergyRationale: 'Efficient single target removal.' },
+          { name: 'Generous Gift', category: 'interaction', cmc: 3, synergyRationale: 'Versatile removal that gives an Elephant token.' },
+          { name: 'Reclamation Sage', category: 'interaction', cmc: 3, synergyRationale: 'Naturalize on a friendly creature body.' },
+          { name: 'Harmonize', category: 'draw', cmc: 4, synergyRationale: 'Straightforward burst card draw.' },
+          { name: 'Return of the Wildspeaker', category: 'draw', cmc: 5, synergyRationale: 'Flexible big draw or team pump.' },
+          { name: 'Swiftfoot Boots', category: 'interaction', cmc: 2, synergyRationale: 'Hexproof protection for commander.' },
+          { name: 'Lightning Greaves', category: 'interaction', cmc: 2, synergyRationale: 'Haste and shroud utility.' },
+          { name: 'Eternal Witness', category: 'engine', cmc: 3, synergyRationale: 'Graveyard recursion on a body.' },
+          { name: 'Sun Titan', category: 'engine', cmc: 6, synergyRationale: 'Recurring value on attack.' },
+          { name: 'Overwhelming Stampede', category: 'payoff', cmc: 5, synergyRationale: 'Combat-based fair win condition.' },
+          { name: 'Chaos Warp', category: 'interaction', cmc: 3, synergyRationale: 'Red removal with fun surprise tuck.' },
+          { name: 'Farseek', category: 'ramp', cmc: 2, synergyRationale: 'Land ramp for typed duals.' },
+          { name: 'Rampant Growth', category: 'ramp', cmc: 2, synergyRationale: 'Reliable turn-two ramp.' }
+        ]
+      };
+    }
+
     // Contextual offline fallback deck based on archetype and color identity
     return {
       commanderName,
@@ -323,8 +356,23 @@ export async function generateFreshDeckWithAI(
     ? `The user optionally owns these cards: ${userCollectionCardNames.slice(0, 50).join(', ')}. You may prioritize fitting cards from this list where synergistic, but feel free to pull from the entire Magic card universe to make the deck fun, fresh, and complete.`
     : 'Pull from the entire Magic: The Gathering card pool to build the ideal fresh and fun deck.';
 
+  const powerTierInstructions = powerTier === 'Casual'
+    ? `TARGET POWER TIER: CASUAL (Bracket 1-2 / Kitchen-Table Friendly).
+- Build a fun, thematic, board-centric casual deck.
+- STRICTLY EXCLUDE fast mana (no Mana Crypt, Mox Diamond, Chrome Mox, Lotus Petal).
+- STRICTLY EXCLUDE free counterspells (no Force of Will, Fierce Guardianship, Pact of Negation) and high-efficiency tutors (no Demonic Tutor, Vampiric Tutor, Imperial Seal).
+- STRICTLY EXCLUDE 2-card instant infinite combos and oppressive stax locks (no Winter Orb, Static Orb, Stasis, Drannith Magistrate).
+- Prioritize engaging combat steps, thematic synergy pieces, resilient incremental value engines, and accessible fun cards.
+- Target estimatedSaltScore < 20.`
+    : powerTier === 'Optimized'
+    ? `TARGET POWER TIER: OPTIMIZED (Bracket 4 / High Velocity).
+- High-efficiency curve, fast mana acceleration, compact win conditions, and top-tier interaction.`
+    : `TARGET POWER TIER: FOCUSED (Bracket 3 / Mid Power).
+- Cohesive synergy, consistent ramp/card advantage engines, and solid interaction packages.`;
+
   const prompt = `You are an elite Magic: The Gathering Commander deck architect powered by Google Gemini.
 Build a cohesive, fun, and fresh deck for Commander "${commanderName}" with color identity [${colorIdentity.join(', ')}] around the archetype "${archetype}".
+${powerTierInstructions}
 ${collectionContext}
 Focus on creative, high-synergy interactions rather than only generic EDHREC staples. Include a solid balance of ramp, draw, engine, interaction, payoffs, and lands.
 For high-dollar cards, provide a realistic budget alternative.

@@ -102,10 +102,34 @@ describe('gemini engine', () => {
       expect(resultNoCollection.cards.length).toBeGreaterThan(0);
       expect(mockGenerateContent).not.toHaveBeenCalled();
 
-      // With optional collection
-      const resultWithCollection = await generateFreshDeckWithAI('Krenko, Mob Boss', ['R'], 'Goblin Swarm', ['Sol Ring', 'Goblin Chieftain']);
+      // With optional collection and casual tier
+      const resultWithCollection = await generateFreshDeckWithAI('Krenko, Mob Boss', ['R'], 'Goblin Swarm', ['Sol Ring', 'Goblin Chieftain'], 'Casual');
       expect(resultWithCollection.commanderName).toBe('Krenko, Mob Boss');
       expect(resultWithCollection.cards.length).toBeGreaterThan(0);
+      expect(resultWithCollection.estimatedSaltScore).toBeLessThanOrEqual(20);
+      expect(resultWithCollection.cards.some((c) => c.name === 'Cultivate')).toBe(true);
+    });
+
+    it('returns casual deck prompt instructions when powerTier is Casual', async () => {
+      process.env.GEMINI_API_KEY = 'fake-api-key';
+      const mockDeck = {
+        commanderName: 'Sythis, Harvest\'s Hand',
+        archetype: 'Enchantress Value',
+        estimatedSaltScore: 18,
+        cards: [
+          { name: 'Enchantress\'s Presence', category: 'draw', cmc: 3, synergyRationale: 'Thematic continuous card advantage.' },
+          { name: 'Sanctum Weaver', category: 'ramp', cmc: 2, synergyRationale: 'Casual enchantress mana engine.' }
+        ]
+      };
+      mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockDeck) });
+
+      const result = await generateFreshDeckWithAI('Sythis, Harvest\'s Hand', ['G', 'W'], 'Enchantress Value', [], 'Casual');
+      expect(result.estimatedSaltScore).toBe(18);
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.stringContaining('TARGET POWER TIER: CASUAL')
+        })
+      );
     });
 
     it('returns parsed generated deck when API call succeeds', async () => {

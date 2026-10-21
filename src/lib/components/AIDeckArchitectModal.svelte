@@ -45,6 +45,7 @@
   let archetypes = $state<ArchetypeSuggestion[]>([]);
   let selectedArchetype = $state<ArchetypeSuggestion | null>(null);
   let customArchetypeName = $state('');
+  let powerTier = $state<'Casual' | 'Focused' | 'Optimized'>('Casual');
   let useCollection = $state(false);
 
   let generatedDeck = $state<GeneratedDeckResult | null>(null);
@@ -65,6 +66,9 @@
       archetypes = results;
       if (results.length > 0) {
         selectedArchetype = results[0];
+        if (results[0].powerTier && ['Casual', 'Focused', 'Optimized'].includes(results[0].powerTier)) {
+          powerTier = results[0].powerTier as 'Casual' | 'Focused' | 'Optimized';
+        }
       }
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Failed to brainstorm archetypes.';
@@ -85,7 +89,8 @@
         commander.name,
         commander.colorIdentity ?? [],
         theme,
-        ownedNames
+        ownedNames,
+        powerTier
       );
       generatedDeck = result;
       step = 'preview';
@@ -184,7 +189,12 @@
                       type="button"
                       class="archetype-card"
                       class:selected={selectedArchetype?.themeName === arch.themeName}
-                      onclick={() => selectedArchetype = arch}
+                      onclick={() => {
+                        selectedArchetype = arch;
+                        if (arch.powerTier && ['Casual', 'Focused', 'Optimized'].includes(arch.powerTier)) {
+                          powerTier = arch.powerTier as 'Casual' | 'Focused' | 'Optimized';
+                        }
+                      }}
                     >
                       <div class="card-top">
                         <span class={`power-badge ${getPowerBadgeClass(arch.powerTier)}`}>
@@ -224,6 +234,58 @@
                   {/each}
                 </div>
 
+                <div class="power-tier-container">
+                  <div class="power-tier-header">
+                    <span class="power-tier-title">Select Deck Power Bracket:</span>
+                    <span class="power-tier-active-hint">
+                      Active: <strong class={`text-${powerTier.toLowerCase()}`}>{powerTier}</strong>
+                    </span>
+                  </div>
+                  <div class="power-tier-options">
+                    <button
+                      type="button"
+                      class="tier-choice-card tier-casual"
+                      class:tier-active={powerTier === 'Casual'}
+                      onclick={() => powerTier = 'Casual'}
+                    >
+                      <div class="tier-top">
+                        <span class="tier-indicator casual-ind"></span>
+                        <span class="tier-name">🌿 Casual Deck</span>
+                        <span class="bracket-badge">Bracket 1–2</span>
+                      </div>
+                      <p class="tier-desc">Kitchen-table friendly. Focuses on fun board synergy & flavor. Strictly no fast mana or 2-card infinite combos.</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="tier-choice-card tier-focused"
+                      class:tier-active={powerTier === 'Focused'}
+                      onclick={() => powerTier = 'Focused'}
+                    >
+                      <div class="tier-top">
+                        <span class="tier-indicator focused-ind"></span>
+                        <span class="tier-name">⚡ Focused Deck</span>
+                        <span class="bracket-badge">Bracket 3</span>
+                      </div>
+                      <p class="tier-desc">Cohesive game plan with consistent ramp, solid card draw, and resilient interaction package.</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="tier-choice-card tier-optimized"
+                      class:tier-active={powerTier === 'Optimized'}
+                      onclick={() => powerTier = 'Optimized'}
+                    >
+                      <div class="tier-top">
+                        <span class="tier-indicator optimized-ind"></span>
+                        <span class="tier-name">🔥 Optimized Deck</span>
+                        <span class="bracket-badge">Bracket 4</span>
+                      </div>
+                      <p class="tier-desc">High-velocity curve, efficient tutors, fast mana acceleration, and compact win lines.</p>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="custom-theme-box">
                   <label for="custom-theme-input">Or specify a custom archetype idea:</label>
                   <input
@@ -261,8 +323,13 @@
             <div class="preview-container">
               <div class="preview-header">
                 <div>
-                  <h3>{generatedDeck.archetype}</h3>
-                  <p>Tailored <strong>{commander.name}</strong> list · Salt Score: <strong>{generatedDeck.estimatedSaltScore}/100</strong></p>
+                  <div class="preview-title-row">
+                    <h3>{generatedDeck.archetype}</h3>
+                    <span class={`power-badge ${getPowerBadgeClass(powerTier)}`}>
+                      {powerTier === 'Casual' ? '🌿 Casual' : powerTier === 'Focused' ? '⚡ Focused' : '🔥 Optimized'}
+                    </span>
+                  </div>
+                  <p>Tailored <strong>{commander.name}</strong> list · Estimated Salt: <strong>{generatedDeck.estimatedSaltScore}/100</strong></p>
                 </div>
                 <button class="subtle-btn" onclick={() => step = 'archetypes'}>
                   Back to Archetypes
@@ -313,9 +380,9 @@
               onclick={handleGenerateDeck}
             >
               {#if isGenerating}
-                <Loader2 size={14} class="spinner" /> Generating Deck...
+                <Loader2 size={14} class="spinner" /> Generating {powerTier} Deck...
               {:else}
-                <Wand2 size={14} /> Build Deck with AI
+                <Wand2 size={14} /> Build {powerTier} Deck with AI
               {/if}
             </button>
           {:else}
@@ -551,6 +618,133 @@
     background: rgba(239, 68, 68, 0.15);
     color: #f87171;
     border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .preview-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .power-tier-container {
+    background: rgba(20, 24, 36, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .power-tier-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .power-tier-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .power-tier-active-hint {
+    font-size: 0.72rem;
+    color: #94a3b8;
+  }
+
+  .text-casual { color: #4ade80; }
+  .text-focused { color: #fbbf24; }
+  .text-optimized { color: #f87171; }
+
+  .power-tier-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.65rem;
+  }
+
+  .tier-choice-card {
+    background: rgba(15, 18, 28, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    padding: 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .tier-choice-card:hover {
+    background: rgba(22, 27, 42, 0.9);
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+  }
+
+  .tier-choice-card.tier-active.tier-casual {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.15);
+  }
+
+  .tier-choice-card.tier-active.tier-focused {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.15);
+  }
+
+  .tier-choice-card.tier-active.tier-optimized {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.15);
+  }
+
+  .tier-top {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .tier-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .casual-ind { background: #22c55e; }
+  .focused-ind { background: #f59e0b; }
+  .optimized-ind { background: #ef4444; }
+
+  .tier-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+
+  .bracket-badge {
+    margin-left: auto;
+    font-size: 0.62rem;
+    font-family: var(--mono);
+    color: #8b90a4;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+  }
+
+  .tier-desc {
+    margin: 0;
+    font-size: 0.68rem;
+    color: #9499ab;
+    line-height: 1.35;
+  }
+
+  @media (max-width: 720px) {
+    .power-tier-options {
+      grid-template-columns: 1fr;
+    }
   }
 
   .selected-pill {
