@@ -76,7 +76,7 @@
     analyzeDeckMarketLiquidation(cards, commander)
   );
 
-  let filteredMatrixCards = $derived<MarketCard[]>(() => {
+  let filteredMatrixCards = $derived.by<MarketCard[]>(() => {
     let list = report.allCards;
     if (filterRisk === 'high') {
       list = list.filter((c) => c.riskLevel === 'Critical Risk' || c.riskLevel === 'High Risk');
@@ -466,7 +466,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredMatrixCards() as card (card.id)}
+            {#each filteredMatrixCards as card (card.id)}
               <tr>
                 <td class="bold-cell">{card.name}</td>
                 <td class="price-cell">${card.currentPriceUsd.toFixed(2)}</td>
@@ -575,7 +575,7 @@
                           <button
                             class="apply-swap-btn"
                             disabled={swappingCard === rec.cardName}
-                            onclick={() => handleSwap({ originalCard: rec.cardName, originalPrice: rec.currentPriceUsd, replacementCard: rec.budgetSwap!, replacementPrice: 1.50, savings: rec.estimatedSavings ?? (rec.currentPriceUsd - 1.50), synergyScore: 90, rationale: 'AI suggested liquidation swap' })}
+                            onclick={() => handleSwap({ originalCard: rec.cardName, originalPrice: rec.currentPriceUsd, replacementCard: rec.budgetSwap!, replacementPrice: 1.50, savings: rec.estimatedSavings ?? (rec.currentPriceUsd - 1.50), synergyNote: 'AI Recommended'})}
                           >
                             <ArrowLeftRight size={11} />
                             {swappingCard === rec.cardName ? 'Swapping...' : 'Swap to Budget'}
