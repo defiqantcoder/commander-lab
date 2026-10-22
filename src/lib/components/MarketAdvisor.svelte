@@ -76,7 +76,7 @@
     analyzeDeckMarketLiquidation(cards, commander)
   );
 
-  let filteredMatrixCards = $derived<MarketCard[]>(() => {
+  let filteredMatrixCards = $derived((() => {
     let list = report.allCards;
     if (filterRisk === 'high') {
       list = list.filter((c) => c.riskLevel === 'Critical Risk' || c.riskLevel === 'High Risk');
@@ -85,8 +85,9 @@
     } else if (filterRisk === 'reserved') {
       list = list.filter((c) => c.isReserved);
     }
-    return [...list].sort((a, b) => b.currentPriceUsd - a.currentPriceUsd);
-  });
+    return [...list].sort((a, b) => b.reprintRiskScore - a.reprintRiskScore);
+  })());
+
 
   async function handleSwap(swap: MarketReplacement): Promise<void> {
     if (!onApplySwap) return;
@@ -466,7 +467,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredMatrixCards() as card (card.id)}
+            {#each filteredMatrixCards as card (card.id)}
               <tr>
                 <td class="bold-cell">{card.name}</td>
                 <td class="price-cell">${card.currentPriceUsd.toFixed(2)}</td>
@@ -575,7 +576,7 @@
                           <button
                             class="apply-swap-btn"
                             disabled={swappingCard === rec.cardName}
-                            onclick={() => handleSwap({ originalCard: rec.cardName, originalPrice: rec.currentPriceUsd, replacementCard: rec.budgetSwap!, replacementPrice: 1.50, savings: rec.estimatedSavings ?? (rec.currentPriceUsd - 1.50), synergyScore: 90, rationale: 'AI suggested liquidation swap' })}
+                            onclick={() => handleSwap({ originalCard: rec.cardName, originalPrice: rec.currentPriceUsd, replacementCard: rec.budgetSwap!, replacementPrice: 1.50, savings: rec.estimatedSavings ?? (rec.currentPriceUsd - 1.50), synergyNote: 'AI suggested liquidation swap',   })}
                           >
                             <ArrowLeftRight size={11} />
                             {swappingCard === rec.cardName ? 'Swapping...' : 'Swap to Budget'}

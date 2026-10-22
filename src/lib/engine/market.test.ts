@@ -57,6 +57,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
       cmc: 4,
       colorIdentity: ['B', 'G'],
       oracleText: 'Whenever another creature you control dies, you get an experience counter.',
+      set: 'test', collectorNumber: '1', foil: false,
       currentPriceUsd: 8.50,
       quantity: 1,
       role: 'commander'
@@ -72,7 +73,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
         oracleText: '{T}: Add {G} for each creature you control.',
         currentPriceUsd: 800.00,
         quantity: 1,
-        role: 'mainboard'
+        manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
       },
       {
         id: 'c2',
@@ -83,7 +84,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
         oracleText: 'Whenever a creature you control leaves the battlefield...',
         currentPriceUsd: 42.00,
         quantity: 1,
-        role: 'mainboard'
+        manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
       },
       {
         id: 'c3',
@@ -94,7 +95,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
         oracleText: 'Search your library for a card...',
         currentPriceUsd: 45.00,
         quantity: 1,
-        role: 'mainboard'
+        manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
       },
       {
         id: 'c4',
@@ -105,7 +106,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
         oracleText: '{T}: Add {G}.',
         currentPriceUsd: 0.25,
         quantity: 1,
-        role: 'mainboard'
+        manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
       },
       {
         id: 'c5',
@@ -116,7 +117,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
         oracleText: '{T}: Add {B}.',
         currentPriceUsd: 0.10,
         quantity: 1,
-        role: 'mainboard'
+        manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
       }
     ];
 
@@ -184,7 +185,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
           oracleText: 'Whenever an opponent casts a spell...',
           currentPriceUsd: 60.00,
           quantity: 1,
-          role: 'mainboard'
+          manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
         },
         {
           id: 'v2',
@@ -195,7 +196,7 @@ describe('Market & Liquidation Intelligence Engine', () => {
           oracleText: 'Whenever an opponent draws a card...',
           currentPriceUsd: 30.00,
           quantity: 1,
-          role: 'mainboard'
+          manaCost: '', set: 'test', collectorNumber: '1', foil: false, role: 'other'
         }
       ];
 
