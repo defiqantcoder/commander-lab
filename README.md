@@ -1,3 +1,11 @@
+# Commander Lab
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Interactive MTG Commander Architect & Market Intelligence. A local-first Progressive Web App (PWA) engineered specifically for Magic: The Gathering (MTG) Commander deck architecture, deep synergy discovery, goldfish simulation, and real-time market liquidation intelligence.
+
+---
+
 # Project 1: Commander Lab
 ### Interactive MTG Commander Architect & Market Intelligence
 
